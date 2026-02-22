@@ -18,31 +18,33 @@
 
 *(Все нужные файлы для Render, такие как `package.json`, `.gitignore` и `render.yaml` уже созданы в проекте).*
 
-## Шаг 2: Деплой на Render (Автоматически)
+## Шаг 2: Деплой на Render (Web Service)
 
-Так как в проекте уже есть файл конфигурации `render.yaml` (Blueprint), деплой будет очень простым:
+Так как вы создаете Web Service вручную (не через Blueprint):
 
 1. Перейдите на сайт [Render.com](https://render.com) и войдите через GitHub.
-2. В панели управления (Dashboard) нажмите кнопку **New +** в правом верхнем углу и выберите **Blueprint**.
-3. Подключите ваш GitHub аккаунт, если ещё не сделали этого, и выберите репозиторий, который вы создали на Шаге 1.
-4. Render найдет файл `render.yaml` и предложит создать Web Service (`roode-editor`).
-5. Нажмите **Apply** (или **Create**).
-
-Render сам выполнит `npm install` и `node server.js`. 
-В течение пары минут ваш сайт будет доступен по адресу вроде `https://roode-editor-xxxx.onrender.com`.
-
-## Шаг 3: Настройка Базы Данных (Environment Variables)
-
-В `render.yaml` указана переменная `DATABASE_URL` (без жестко заданного значения для безопасности). 
-Чтобы проекты сохранялись, нам нужно добавить ссылку на вашу базу Neon:
-
-1. В дашборде Render откройте только что созданный сервис **roode-editor**.
-2. В боковом меню выберите **Environment**.
-3. Нажмите **Add Environment Variable**.
-4. Введите:
+2. В панели управления (Dashboard) нажмите кнопку **New +** в правом верхнем углу и выберите **Web Service**.
+3. Выберите **Build and deploy from a Git repository**.
+4. Подключите ваш GitHub аккаунт, если ещё не сделали этого, и выберите репозиторий `roode`.
+5. Настройте конфигурацию сервиса:
+   - **Name**: `roode-editor` (или любое другое)
+   - **Language**: `Node`
+   - **Branch**: `main`
+   - **Build Command**: `npm install`
+   - **Start Command**: `node server.js`
+   - **Instance Type**: Бесплатный тариф (Free) — листайте вниз
+6. Нажмите **Advanced** (ниже выбора тарифа).
+7. Добавьте первую переменную окружения (Environment Variable):
    - **Key**: `DATABASE_URL`
    - **Value**: `postgresql://neondb_owner:npg_dHsFwb0T1hSI@ep-solitary-smoke-aimoqeek-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require`
-5. Нажмите **Save Changes**. (Сервис автоматически перезапустится с вашей БД).
+8. Добавьте вторую переменную:
+   - **Key**: `PORT`
+   - **Value**: `10000`
+9. Нажмите кнопку **Create Web Service** в самом низу.
+
+Render начнёт собирать ваш проект. В течение пары минут ваш сайт будет готов и доступен по адресу вроде `https://roode-editor-xxxx.onrender.com`.
+
+*(Шаг 3 из прошлой инструкции мы уже сделали выше, добавив DATABASE_URL при создании, поэтому сразу переходим к настройке вашего домена 🚀)*
 
 ## Шаг 4: Привязка реального домена (roode.pp.ua)
 
