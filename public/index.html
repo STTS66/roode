@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roode v2.5 (Projects & Sync)</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --sidebar-color: #252526;
+            --text-color: #d4d4d4;
+            --accent-color: #007acc;
+            --line-number-color: #858585;
+            --header-height: 40px;
+            --menu-hover: #094771;
+
+            --editor-font: 'Consolas', 'Monaco', 'Courier New', monospace;
+            --editor-size: 14px;
+            --editor-line-height: 20px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-family: -apple-system, sans-serif;
+        }
+
+        /* HEADER */
+        header {
+            height: var(--header-height);
+            background: #333;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            justify-content: space-between;
+            border-bottom: 1px solid #111;
+            user-select: none;
+            z-index: 20;
+        }
+
+        .controls {
+            display: flex;
+            gap: 6px;
+            position: relative;
+        }
+
+        .logo {
+            font-weight: bold;
+            color: white;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+
+        .btn {
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            color: white;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-blue {
+            background: var(--accent-color);
+        }
+
+        .btn-blue:hover {
+            background: #0062a3;
+        }
+
+        .btn-green {
+            background: #238636;
+        }
+
+        .btn-green:hover {
+            background: #2ea043;
+        }
+
+        .btn-gray {
+            background: #444;
+        }
+
+        .btn-gray:hover {
+            background: #555;
+        }
+
+        /* MENU */
+        .dropdown {
+            position: absolute;
+            top: 30px;
+            right: 0;
+            background: #252526;
+            border: 1px solid #454545;
+            border-radius: 4px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            display: none;
+            flex-direction: column;
+            min-width: 150px;
+            z-index: 100;
+        }
+
+        .dropdown.show {
+            display: flex;
+        }
+
+        .dropdown-item {
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #ccc;
+            border-bottom: 1px solid #333;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: var(--menu-hover);
+            color: white;
+        }
+
+        /* WORKSPACE */
+        .workspace {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - var(--header-height) - 25px);
+        }
+
+        .sidebar {
+            width: 250px;
+            background: var(--sidebar-color);
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-tabs {
+            display: flex;
+            background: #2b2b2c;
+            border-bottom: 1px solid #111;
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: #888;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .sidebar-tab.active {
+            color: #fff;
+            border-bottom-color: var(--accent-color);
+            background: #333;
+        }
+
+        .sidebar-header {
+            padding: 10px 15px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #aaa;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-list {
+            flex: 1;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            padding: 4px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #ccc;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+
+        .file-item:hover {
+            background: #2a2d2e;
+        }
+
+        .file-item.active {
+            background: #37373d;
+            border-left-color: var(--accent-color);
+            color: #fff;
+        }
+
+        .project-item {
+            padding: 8px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #ccc;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            border-bottom: 1px solid #333;
+        }
+
+        .project-item:hover {
+            background: #2a2d2e;
+        }
+
+        .project-item.active {
+            background: #37373d;
+            border-left-color: var(--accent-color);
+            color: #fff;
+        }
+
+        .project-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .project-name {
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-path {
+            font-size: 10px;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-actions {
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .project-item:hover .project-actions {
+            opacity: 1;
+        }
+
+        .del-btn {
+            color: #666;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        .del-btn:hover {
+            color: #f44;
+            background: rgba(255, 0, 0, 0.1);
+        }
+
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: var(--bg-color);
+            min-width: 0;
+        }
+
+        .tab-bar {
+            height: 35px;
+            background: #252526;
+            display: flex;
+            align-items: center;
+        }
+
+        .tab {
+            padding: 0 15px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            background: #1e1e1e;
+            font-size: 13px;
+            border-top: 2px solid var(--accent-color);
+        }
+
+        .code-wrapper {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gutter {
+            width: 45px;
+            flex-shrink: 0;
+            background: #1e1e1e;
+            color: var(--line-number-color);
+            text-align: right;
+            border-right: 1px solid #333;
+            user-select: none;
+            overflow: hidden;
+            padding-top: 10px;
+            box-sizing: border-box;
+        }
+
+        .line-num {
+            height: var(--editor-line-height);
+            line-height: var(--editor-line-height);
+            font-family: var(--editor-font);
+            font-size: var(--editor-size);
+            padding-right: 8px;
+        }
+
+        textarea#editor {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            color: var(--text-color);
+            padding: 10px;
+            box-sizing: border-box;
+            font-family: var(--editor-font);
+            font-size: var(--editor-size);
+            line-height: var(--editor-line-height);
+            tab-size: 4;
+            white-space: pre;
+            overflow-x: scroll;
+            overflow-y: scroll;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 5px;
+        }
+
+        footer {
+            height: 25px;
+            background: var(--accent-color);
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            color: white;
+            font-size: 11px;
+            justify-content: space-between;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            align-items: center;
+            justify-content: center;
+            z-index: 99;
+        }
+
+        .modal {
+            background: #252526;
+            padding: 20px;
+            width: 300px;
+            border: 1px solid #444;
+            text-align: center;
+            border-radius: 5px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal input {
+            width: 90%;
+            padding: 8px;
+            margin: 10px 0;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 3px;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        .modal input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">Roode <span style="font-size:10px;opacity:0.5">2.5</span></div>
+        <div class="controls">
+            <button class="btn btn-blue" onclick="selFolder()">📂 Папка</button>
+            <button class="btn btn-green" onclick="showNewFile()">➕ Файл</button>
+            <button class="btn btn-gray" onclick="save()">💾 Save</button>
+            <button class="btn btn-gray" style="font-size: 14px; font-weight: bold; padding: 2px 10px;"
+                onclick="toggleMenu(event)">•••</button>
+            <div id="mainMenu" class="dropdown">
+                <div class="dropdown-item" onclick="saveAs()">Сохранить как...</div>
+                <div class="dropdown-item" onclick="exportTxt()">Скачать .txt</div>
+                <div class="dropdown-item" style="color:#ff6b6b" onclick="closeAll()">Закрыть всё</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <div class="sidebar">
+            <div class="sidebar-tabs">
+                <div class="sidebar-tab active" id="tabExplorer" onclick="switchSidebar('explorer')">ФАЙЛЫ</div>
+                <div class="sidebar-tab" id="tabProjects" onclick="switchSidebar('projects')">ПРОЕКТЫ</div>
+            </div>
+
+            <!-- EXPLORER VIEW -->
+            <div id="viewExplorer" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="sidebar-header">
+                    <span id="labelHeader">ПРОВОДНИК</span>
+                    <span style="cursor:pointer" onclick="listRender()">↻</span>
+                </div>
+                <ul id="listUI" class="file-list"></ul>
+            </div>
+
+            <!-- PROJECTS VIEW -->
+            <div id="viewProjects" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="sidebar-header">
+                    <span>ПРОЕКТЫ (Cloud Sync)</span>
+                    <button class="btn btn-blue" style="padding: 2px 6px; font-size: 10px;" onclick="showNewProject()">+
+                        Новый</button>
+                </div>
+                <ul id="projectsUI" class="file-list">
+                    <!-- Projects injected here -->
+                </ul>
+            </div>
+        </div>
+        <div class="editor-container">
+            <div class="tab-bar">
+                <div class="tab" id="tabInfo">...</div>
+            </div>
+            <div class="code-wrapper">
+                <div id="gutter" class="gutter"></div>
+                <textarea id="editor" spellcheck="false"
+                    placeholder="// Roode v2.5 (Projects & Cloud Sync - Node.js Backend)"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div id="msg">Готов</div>
+        <div id="activeProjectLabel" style="opacity: 0.7">No Project</div>
+    </footer>
+
+    <!-- NEW FILE MODAL -->
+    <div class="overlay" id="modFile">
+        <div class="modal">
+            <h3>Новый файл</h3>
+            <input id="fname" placeholder="name.PRSH"><br>
+            <div class="modal-buttons">
+                <button class="btn btn-blue" onclick="createFile()">Создать</button>
+                <button class="btn btn-gray"
+                    onclick="document.getElementById('modFile').style.display='none'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW PROJECT MODAL -->
+    <div class="overlay" id="modProject">
+        <div class="modal">
+            <h3>Новый проект</h3>
+            <input id="pname" placeholder="Мой Супер Проект"><br>
+            <div style="font-size: 12px; color: #aaa; margin-bottom: 10px; text-align: left; padding: 0 5%;">
+                Нажмите "Создать", затем выберите папку на вашем ПК для этого проекта.
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-blue" onclick="createProject()">Выбрать папку & Создать</button>
+                <button class="btn btn-gray"
+                    onclick="document.getElementById('modProject').style.display='none'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let fHandle = null, fileH = null, isDir = false;
+        let filesCache = [];
+        let projectMemory = {};
+        let isCreating = false;
+
+        // Projects State
+        let projectsList = [];
+        let activeProjectId = null;
+
+        const ed = document.getElementById('editor');
+        const gut = document.getElementById('gutter');
+        const ui = document.getElementById('listUI');
+        const msg = document.getElementById('msg');
+        const tab = document.getElementById('tabInfo');
+        const label = document.getElementById('labelHeader');
+        const menu = document.getElementById('mainMenu');
+
+        // UI Switches
+        function switchSidebar(view) {
+            document.getElementById('tabExplorer').classList.remove('active');
+            document.getElementById('tabProjects').classList.remove('active');
+            document.getElementById('viewExplorer').style.display = 'none';
+            document.getElementById('viewProjects').style.display = 'none';
+
+            if (view === 'explorer') {
+                document.getElementById('tabExplorer').classList.add('active');
+                document.getElementById('viewExplorer').style.display = 'flex';
+            } else {
+                document.getElementById('tabProjects').classList.add('active');
+                document.getElementById('viewProjects').style.display = 'flex';
+                loadProjects();
+            }
+        }
+
+        // Numbers & Events
+        function updateLines() {
+            if (!ed.value) { gut.innerHTML = `<div class="line-num">1</div>`; return; }
+            const linesCount = ed.value.split('\n').length;
+            let html = '';
+            for (let i = 0; i < linesCount; i++) { html += `<div class="line-num">${i + 1}</div>`; }
+            gut.innerHTML = html;
+        }
+        ed.addEventListener('input', () => {
+            updateLines();
+            if (!isDir && fileH) projectMemory[fileH.name] = ed.value;
+        });
+        ed.addEventListener('scroll', () => { gut.scrollTop = ed.scrollTop; });
+        ed.addEventListener('keydown', () => setTimeout(updateLines, 0));
+
+        document.getElementById('fname').addEventListener('keydown', e => { if (e.key === 'Enter') createFile(); });
+        document.getElementById('pname').addEventListener('keydown', e => { if (e.key === 'Enter') createProject(); });
+
+        function toggleMenu(e) { e.stopPropagation(); menu.classList.toggle('show'); }
+        window.addEventListener('click', () => menu.classList.remove('show'));
+
+        // --- API / PROJECTS LOGIC ---
+
+        async function loadProjects() {
+            try {
+                const res = await fetch('/api/projects');
+                projectsList = await res.json();
+                renderProjects();
+            } catch (e) {
+                console.error(e);
+                notify("Ошибка загрузки проектов");
+            }
+        }
+
+        function renderProjects() {
+            const pUI = document.getElementById('projectsUI');
+            pUI.innerHTML = '';
+
+            projectsList.forEach((p, index) => {
+                const li = document.createElement('li');
+                li.className = 'project-item' + (activeProjectId === p.id ? ' active' : '');
+
+                li.innerHTML = `
+                <div class="project-info" onclick="openProject(${p.id})">
+                    <div class="project-name">${p.name}</div>
+                    <div class="project-path">${p.folder_path || 'No path'}</div>
+                </div>
+                <div class="project-actions">
+                    <span class="del-btn" onclick="deleteProject(${p.id}, event)">🗑</span>
+                </div>
+            `;
+                pUI.appendChild(li);
+            });
+        }
+
+        function showNewProject() {
+            document.getElementById('pname').value = '';
+            document.getElementById('modProject').style.display = 'flex';
+            document.getElementById('pname').focus();
+        }
+
+        async function createProject() {
+            const name = document.getElementById('pname').value.trim();
+            if (!name) return;
+
+            try {
+                // First ask user to pick a folder to link this project to
+                const dirHandle = await window.showDirectoryPicker();
+                const folderPath = dirHandle.name; // Browser doesn't give full path for security, we save the folder name
+
+                const res = await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, folder_path: folderPath })
+                });
+                const newProj = await res.json();
+
+                document.getElementById('modProject').style.display = 'none';
+                await loadProjects();
+                notify(`Проект ${name} создан!`);
+
+                // Auto open it since we have the handle
+                fHandle = dirHandle;
+                isDir = true;
+                activeProjectId = newProj.id;
+                loadWorkspaceFromHandle(newProj.name);
+
+            } catch (e) {
+                console.log("Creation cancelled or failed", e);
+            }
+        }
+
+        async function deleteProject(id, e) {
+            e.stopPropagation();
+            if (!confirm('Удалить проект из базы? Файлы на диске останутся.')) return;
+
+            try {
+                await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+                if (activeProjectId === id) {
+                    activeProjectId = null;
+                    document.getElementById('activeProjectLabel').textContent = "No Project";
+                }
+                loadProjects();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function openProject(id) {
+            const proj = projectsList.find(p => p.id === id);
+            if (!proj) return;
+
+            try {
+                // Because of browser security, we can't just auto-open a path from DB without user interaction.
+                // We ask them to select the folder again to grant permissions.
+                alert(`Пожалуйста, выберите папку: ${proj.folder_path} для проекта ${proj.name}`);
+                const handle = await window.showDirectoryPicker();
+
+                fHandle = handle;
+                isDir = true;
+                activeProjectId = proj.id;
+
+                loadWorkspaceFromHandle(proj.name);
+
+                // Attempt to load the last opened file
+                if (proj.last_file) {
+                    for await (const [n, h] of fHandle.entries()) {
+                        if (h.kind === 'file' && n === proj.last_file) {
+                            await load(h);
+                            break;
+                        }
+                    }
+                }
+
+            } catch (e) {
+                console.error("Folder selection cancelled/failed");
+            }
+        }
+
+        function loadWorkspaceFromHandle(projectName) {
+            label.textContent = fHandle.name.toUpperCase();
+            document.getElementById('activeProjectLabel').textContent = `Project: ${projectName}`;
+            projectMemory = {}; filesCache = []; resetEd();
+            listRender();
+            switchSidebar('explorer');
+        }
+
+        // --- FILE LOGIC ---
+
+        async function saveAs() {
+            try {
+                const options = {
+                    types: [{ description: 'RuPL File', accept: { 'text/plain': ['.PRSH', '.PRSHX'] } }],
+                    suggestedName: fileH ? fileH.name : 'Untitled.PRSH'
+                };
+                const newHandle = await window.showSaveFilePicker(options);
+                const w = await newHandle.createWritable();
+                await w.write(ed.value); await w.close();
+                notify(`Saved as: ${newHandle.name}`);
+                if (!isDir) { filesCache.push(newHandle); projectMemory[newHandle.name] = ed.value; }
+                listRender();
+                load(newHandle);
+            } catch (err) { }
+        }
+
+        function exportTxt() {
+            const blob = new Blob([ed.value], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = (fileH ? fileH.name : 'code') + '.txt';
+            a.click();
+        }
+
+        function closeAll() {
+            if (!confirm("Закрыть всё?")) return;
+            projectMemory = {}; filesCache = []; fHandle = null; isDir = false;
+            activeProjectId = null;
+            document.getElementById('activeProjectLabel').textContent = "No Project";
+            label.textContent = "ПРОВОДНИК"; resetEd(); listRender();
+        }
+
+        async function selFolder() {
+            try {
+                fHandle = await window.showDirectoryPicker();
+                isDir = true; label.textContent = fHandle.name.toUpperCase();
+                activeProjectId = null;
+                document.getElementById('activeProjectLabel').textContent = "Local Folder";
+                projectMemory = {}; filesCache = []; resetEd(); listRender();
+                switchSidebar('explorer');
+            } catch (e) { }
+        }
+
+        function resetEd() { fileH = null; ed.value = ''; tab.textContent = "---"; updateLines(); }
+
+        async function listRender() {
+            ui.innerHTML = '';
+            let list = [];
+            if (isDir && fHandle) {
+                for await (const [n, h] of fHandle.entries()) {
+                    if (h.kind === 'file' && n.toUpperCase().match(/\.(PRSH|PRSHX|TXT)$/)) list.push(h);
+                }
+            } else if (!isDir) list = [...filesCache];
+
+            list.sort((a, b) => a.name.localeCompare(b.name)).forEach(h => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.dataset.name = h.name;
+
+                if (fileH && fileH.name === h.name) li.classList.add('active');
+
+                const ico = h.name.match(/X$/i) ? '🧩' : '📄';
+                li.innerHTML = `<span>${ico} ${h.name}</span><span class="del-btn">🗑</span>`;
+                li.onclick = (e) => { if (!e.target.className.includes('del')) load(h); };
+                li.querySelector('.del-btn').onclick = async () => {
+                    if (!confirm('Удалить файл?')) return;
+                    if (isDir) await fHandle.removeEntry(h.name);
+                    else { filesCache = filesCache.filter(x => x != h); delete projectMemory[h.name]; }
+                    if (fileH && fileH.name == h.name) resetEd();
+                    listRender();
+                };
+                ui.appendChild(li);
+            });
+        }
+
+        async function load(h) {
+            fileH = h;
+            const items = document.querySelectorAll('.file-item');
+            items.forEach(li => {
+                li.classList.remove('active');
+                if (li.dataset.name === h.name) li.classList.add('active');
+            });
+
+            // Save last file to backend if inside a project
+            if (activeProjectId) {
+                fetch(`/api/projects/${activeProjectId}/last-file`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ last_file: h.name })
+                }).catch(e => console.log(e));
+            }
+
+            if (isDir) { const f = await h.getFile(); ed.value = await f.text(); }
+            else { ed.value = projectMemory[h.name] || ""; }
+            tab.textContent = h.name; msg.textContent = h.name; updateLines();
+        }
+
+        async function save() {
+            if (isDir) {
+                if (!fileH) return alert('Нет файла');
+                const w = await fileH.createWritable(); await w.write(ed.value); await w.close();
+                notify(`Saved: ${fileH.name}`);
+            } else {
+                if (filesCache.length === 0) return alert("Пусто");
+                if (fileH) projectMemory[fileH.name] = ed.value;
+                try {
+                    let c = 0;
+                    for (let h of filesCache) {
+                        const ct = projectMemory[h.name];
+                        if (ct !== undefined) { const w = await h.createWritable(); await w.write(ct); await w.close(); c++; }
+                    }
+                    notify(`✅ Updated ${c} files`);
+                } catch (e) { alert("Err: " + e.message); }
+            }
+        }
+
+        function notify(txt) { msg.textContent = txt; setTimeout(() => msg.textContent = 'Готов', 3000); }
+
+        function showNewFile() {
+            if (!isDir) return alert('Сначала откройте папку или проект');
+            document.getElementById('fname').value = '';
+            document.getElementById('modFile').style.display = 'flex';
+            document.getElementById('fname').focus();
+        }
+
+        async function createFile() {
+            if (isCreating) return;
+
+            let n = document.getElementById('fname').value.trim();
+            if (!n) return;
+            if (!n.match(/\./)) n += '.PRSH';
+
+            isCreating = true;
+
+            try {
+                const nh = await fHandle.getFileHandle(n, { create: true });
+                const w = await nh.createWritable(); await w.write('// Roode Project File\n\n'); await w.close();
+
+                document.getElementById('modFile').style.display = 'none';
+                await listRender();
+                await load(nh);
+                switchSidebar('explorer');
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка создания файла");
+            } finally {
+                isCreating = false;
+            }
+        }
+
+        // Shortcuts
+        document.addEventListener('keydown', async (e) => {
+            // SAVE: Ctrl + S
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                save();
+            }
+
+            // PRECH SWITCH PROJECT: Ctrl + [ or Ctrl + ]
+            if (e.ctrlKey && projectsList.length > 0) {
+                if (e.key === '[' || e.key === ']') {
+                    e.preventDefault();
+                    let currentIndex = projectsList.findIndex(p => p.id === activeProjectId);
+                    if (currentIndex === -1) currentIndex = 0;
+
+                    let nextIndex;
+                    if (e.key === ']') { // Next project
+                        nextIndex = (currentIndex + 1) % projectsList.length;
+                    } else { // Prev project
+                        nextIndex = (currentIndex - 1 + projectsList.length) % projectsList.length;
+                    }
+
+                    await openProject(projectsList[nextIndex].id);
+                }
+            }
+        });
+
+        // Init
+        updateLines();
+        loadProjects(); // Preload projects from backend
+
+    </script>
+</body>
+
+</html>
