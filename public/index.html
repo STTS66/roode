@@ -514,7 +514,9 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { get, set, del } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
+
         let fHandle = null, fileH = null, isDir = false;
         let filesCache = [];
         let projectMemory = {};
@@ -626,6 +628,9 @@
                 });
                 const newProj = await res.json();
 
+                // Save handle to IndexedDB
+                await set(`roode_handle_${newProj.id}`, dirHandle);
+
                 document.getElementById('modProject').style.display = 'none';
                 await loadProjects();
                 notify(`Проект ${name} создан!`);
@@ -647,6 +652,8 @@
 
             try {
                 await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+                await del(`roode_handle_${id}`); // Delete handle from IndexedDB
+
                 if (activeProjectId === id) {
                     activeProjectId = null;
                     document.getElementById('activeProjectLabel').textContent = "No Project";
@@ -657,15 +664,41 @@
             }
         }
 
+        async function verifyPermission(fileHandle, readWrite) {
+            const options = {};
+            if (readWrite) {
+                options.mode = 'readwrite';
+            }
+            if ((await fileHandle.queryPermission(options)) === 'granted') {
+                return true;
+            }
+            if ((await fileHandle.requestPermission(options)) === 'granted') {
+                return true;
+            }
+            return false;
+        }
+
         async function openProject(id) {
             const proj = projectsList.find(p => p.id === id);
             if (!proj) return;
 
             try {
-                // Because of browser security, we can't just auto-open a path from DB without user interaction.
-                // We ask them to select the folder again to grant permissions.
-                alert(`Пожалуйста, выберите папку: ${proj.folder_path} для проекта ${proj.name}`);
-                const handle = await window.showDirectoryPicker();
+                let handle = await get(`roode_handle_${proj.id}`);
+
+                if (handle) {
+                    // Ask permission nicely instead of system prompt if possible
+                    const hasPerm = await verifyPermission(handle, true);
+                    if (!hasPerm) {
+                        throw new Error("No permission");
+                    }
+                } else {
+                    // Because of browser security, we can't just auto-open a path from DB without user interaction.
+                    // We ask them to select the folder again to grant permissions.
+                    alert(`Папка для проекта не найдена в кэше браузера.\nПожалуйста, выберите папку заново: ${proj.folder_path} для проекта ${proj.name}`);
+                    handle = await window.showDirectoryPicker();
+                    // Save it to cache for next time
+                    await set(`roode_handle_${proj.id}`, handle);
+                }
 
                 fHandle = handle;
                 isDir = true;
@@ -684,7 +717,7 @@
                 }
 
             } catch (e) {
-                console.error("Folder selection cancelled/failed");
+                console.error("Folder selection cancelled/failed", e);
             }
         }
 
@@ -875,7 +908,22 @@
             }
         });
 
-        // Init
+        // Init global hooks for inline HTML onclick handlers since module scope encapsulates standard scripts
+        window.selFolder = selFolder;
+        window.showNewFile = showNewFile;
+        window.save = save;
+        window.toggleMenu = toggleMenu;
+        window.saveAs = saveAs;
+        window.exportTxt = exportTxt;
+        window.closeAll = closeAll;
+        window.listRender = listRender;
+        window.showNewProject = showNewProject;
+        window.createProject = createProject;
+        window.deleteProject = deleteProject;
+        window.openProject = openProject;
+        window.createFile = createFile;
+        window.switchSidebar = switchSidebar;
+
         updateLines();
         loadProjects(); // Preload projects from backend
 
