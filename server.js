@@ -15,6 +15,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- API ROUTES ---
 
+// Ping route for UptimeRobot to keep the free server awake
+app.get('/ping', (req, res) => {
+    res.status(200).send('pong');
+});
+
 // Get all projects
 app.get('/api/projects', async (req, res) => {
     try {
