@@ -482,7 +482,11 @@
 
     <footer>
         <div id="msg">Готов</div>
-        <div id="activeProjectLabel" style="opacity: 0.7">No Project</div>
+        <div id="activeProjectContainer" style="display: flex; align-items: center; gap: 8px;">
+            <div id="activeProjectStatus" style="width: 8px; height: 8px; border-radius: 50%; background-color: #f44;">
+            </div>
+            <div id="activeProjectLabel" style="font-weight: bold; letter-spacing: 0.5px;">No Project</div>
+        </div>
     </footer>
 
     <!-- NEW FILE MODAL -->
@@ -590,13 +594,17 @@
             pUI.innerHTML = '';
 
             projectsList.forEach((p, index) => {
+                const isActive = activeProjectId === p.id;
                 const li = document.createElement('li');
-                li.className = 'project-item' + (activeProjectId === p.id ? ' active' : '');
+                li.className = 'project-item' + (isActive ? ' active' : '');
+
+                // Add a small green dot indicator for active project in sidebar too
+                const indicator = isActive ? `<span style="color:#4caf50; font-size: 16px; margin-right: 5px;">•</span>` : `<span style="width: 14px; display:inline-block; margin-right: 5px;"></span>`;
 
                 li.innerHTML = `
                 <div class="project-info" onclick="openProject(${p.id})">
-                    <div class="project-name">${p.name}</div>
-                    <div class="project-path">${p.folder_path || 'No path'}</div>
+                    <div class="project-name" style="${isActive ? 'color: #fff; font-weight: bold;' : ''}">${indicator}${p.name}</div>
+                    <div class="project-path" style="padding-left: 19px;">${p.folder_path || 'No path'}</div>
                 </div>
                 <div class="project-actions">
                     <span class="del-btn" onclick="deleteProject(${p.id}, event)">🗑</span>
@@ -657,6 +665,7 @@
                 if (activeProjectId === id) {
                     activeProjectId = null;
                     document.getElementById('activeProjectLabel').textContent = "No Project";
+                    document.getElementById('activeProjectStatus').style.backgroundColor = "#f44";
                 }
                 loadProjects();
             } catch (err) {
@@ -723,10 +732,15 @@
 
         function loadWorkspaceFromHandle(projectName) {
             label.textContent = fHandle.name.toUpperCase();
-            document.getElementById('activeProjectLabel').textContent = `Project: ${projectName}`;
+            document.getElementById('activeProjectLabel').textContent = `[ ${projectName} ]`;
+            document.getElementById('activeProjectLabel').style.color = "#4caf50";
+            document.getElementById('activeProjectStatus').style.backgroundColor = "#4caf50";
+            document.getElementById('activeProjectStatus').style.boxShadow = "0 0 8px #4caf50";
+
             projectMemory = {}; filesCache = []; resetEd();
             listRender();
             switchSidebar('explorer');
+            renderProjects(); // Re-render sidebar to update the green dot
         }
 
         // --- FILE LOGIC ---
@@ -760,7 +774,11 @@
             projectMemory = {}; filesCache = []; fHandle = null; isDir = false;
             activeProjectId = null;
             document.getElementById('activeProjectLabel').textContent = "No Project";
+            document.getElementById('activeProjectLabel').style.color = "var(--text-color)";
+            document.getElementById('activeProjectStatus').style.backgroundColor = "#f44";
+            document.getElementById('activeProjectStatus').style.boxShadow = "none";
             label.textContent = "ПРОВОДНИК"; resetEd(); listRender();
+            if (document.getElementById('tabProjects').classList.contains('active')) renderProjects();
         }
 
         async function selFolder() {
@@ -769,8 +787,12 @@
                 isDir = true; label.textContent = fHandle.name.toUpperCase();
                 activeProjectId = null;
                 document.getElementById('activeProjectLabel').textContent = "Local Folder";
+                document.getElementById('activeProjectLabel').style.color = "var(--text-color)";
+                document.getElementById('activeProjectStatus').style.backgroundColor = "#ff9800";
+                document.getElementById('activeProjectStatus').style.boxShadow = "none";
                 projectMemory = {}; filesCache = []; resetEd(); listRender();
                 switchSidebar('explorer');
+                if (document.getElementById('tabProjects').classList.contains('active')) renderProjects();
             } catch (e) { }
         }
 
