@@ -701,6 +701,14 @@
                 if (res.status === 401 || res.status === 403) { window.logout(); return; }
                 projectsList = await res.json();
                 renderProjects();
+
+                // Auto-load last active project on startup
+                if (!activeProjectId) {
+                    const lastProjectId = localStorage.getItem('roode_last_project');
+                    if (lastProjectId && projectsList.some(p => p.id == lastProjectId)) {
+                        await openProject(Number(lastProjectId), true); // true = silent/startup mode
+                    }
+                }
             } catch (e) {
                 console.error(e);
                 notify("Ошибка загрузки проектов");
@@ -785,6 +793,7 @@
 
                 if (activeProjectId === id) {
                     activeProjectId = null;
+                    localStorage.removeItem('roode_last_project');
                     document.getElementById('activeProjectLabel').textContent = "No Project";
                     document.getElementById('activeProjectStatus').style.backgroundColor = "#f44";
                 }
@@ -808,7 +817,7 @@
             return false;
         }
 
-        async function openProject(id) {
+        async function openProject(id, isStartup = false) {
             const proj = projectsList.find(p => p.id === id);
             if (!proj) return;
 
@@ -819,6 +828,7 @@
                     // Ask permission nicely instead of system prompt if possible
                     const hasPerm = await verifyPermission(handle, true);
                     if (!hasPerm) {
+                        if (isStartup) return; // Don't throw errors on startup if user didn't grant perm yet
                         throw new Error("No permission");
                     }
                 } else {
@@ -833,6 +843,7 @@
                 fHandle = handle;
                 isDir = true;
                 activeProjectId = proj.id;
+                localStorage.setItem('roode_last_project', proj.id);
 
                 loadWorkspaceFromHandle(proj.name);
 
@@ -894,6 +905,7 @@
             if (!confirm("Закрыть всё?")) return;
             projectMemory = {}; filesCache = []; fHandle = null; isDir = false;
             activeProjectId = null;
+            localStorage.removeItem('roode_last_project');
             document.getElementById('activeProjectLabel').textContent = "No Project";
             document.getElementById('activeProjectLabel').style.color = "var(--text-color)";
             document.getElementById('activeProjectStatus').style.backgroundColor = "#f44";
@@ -907,6 +919,7 @@
                 fHandle = await window.showDirectoryPicker();
                 isDir = true; label.textContent = fHandle.name.toUpperCase();
                 activeProjectId = null;
+                localStorage.removeItem('roode_last_project');
                 document.getElementById('activeProjectLabel').textContent = "Local Folder";
                 document.getElementById('activeProjectLabel').style.color = "var(--text-color)";
                 document.getElementById('activeProjectStatus').style.backgroundColor = "#ff9800";
