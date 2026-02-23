@@ -126,6 +126,39 @@ app.patch('/api/projects/:id/last-file', authenticateToken, async (req, res) => 
     }
 });
 
+// Edit project name or folder
+app.patch('/api/projects/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { name, folder_path } = req.body;
+
+    try {
+        let query = '';
+        let params = [];
+
+        if (name && folder_path) {
+            query = 'UPDATE projects SET name = $1, folder_path = $2 WHERE id = $3 AND user_id = $4 RETURNING *';
+            params = [name, folder_path, id, req.user.userId];
+        } else if (name) {
+            query = 'UPDATE projects SET name = $1 WHERE id = $2 AND user_id = $3 RETURNING *';
+            params = [name, id, req.user.userId];
+        } else if (folder_path) {
+            query = 'UPDATE projects SET folder_path = $1 WHERE id = $2 AND user_id = $3 RETURNING *';
+            params = [folder_path, id, req.user.userId];
+        } else {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        const result = await pool.query(query, params);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Project not found or unauthorized' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error updating project' });
+    }
+});
+
 // Delete a project
 app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;

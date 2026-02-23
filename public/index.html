@@ -527,6 +527,25 @@
         </div>
     </div>
 
+    <!-- EDIT PROJECT MODAL -->
+    <div class="overlay" id="modEditProject">
+        <div class="modal">
+            <h3>Настройки проекта</h3>
+            <input id="editPname" placeholder="Новое название"><br>
+            <div style="font-size: 12px; color: #aaa; margin-bottom: 15px; text-align: left; padding: 0 5%;">
+                Измените название или выберите новую папку, если папка проекта переместилась.
+            </div>
+            <div class="modal-buttons" style="flex-direction: column; gap: 8px; margin-top: 0;">
+                <button class="btn btn-blue" style="justify-content: center;" onclick="saveEditProject()">Сохранить
+                    название</button>
+                <button class="btn btn-green" style="justify-content: center;" onclick="changeProjectFolder()">Изменить
+                    папку</button>
+                <button class="btn btn-gray" style="justify-content: center;"
+                    onclick="document.getElementById('modEditProject').style.display='none'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
     <!-- AUTH MODAL -->
     <div class="overlay" id="modAuth" style="z-index: 1000; background: var(--bg-color);">
         <div class="modal" id="authBox">
@@ -563,6 +582,7 @@
         // Projects State
         let projectsList = [];
         let activeProjectId = null;
+        let editingProjectId = null;
 
         const ed = document.getElementById('editor');
         const gut = document.getElementById('gutter');
@@ -733,6 +753,7 @@
                     <div class="project-path" style="padding-left: 19px;">${p.folder_path || 'No path'}</div>
                 </div>
                 <div class="project-actions">
+                    <span class="del-btn" style="color:#aaa;" onclick="openEditProject(${p.id}, event)">⚙️</span>
                     <span class="del-btn" onclick="deleteProject(${p.id}, event)">🗑</span>
                 </div>
             `;
@@ -744,6 +765,65 @@
             document.getElementById('pname').value = '';
             document.getElementById('modProject').style.display = 'flex';
             document.getElementById('pname').focus();
+        }
+
+        function openEditProject(id, e) {
+            e.stopPropagation();
+            const proj = projectsList.find(p => p.id === id);
+            if (!proj) return;
+            editingProjectId = id;
+            document.getElementById('editPname').value = proj.name;
+            document.getElementById('modEditProject').style.display = 'flex';
+        }
+
+        async function saveEditProject() {
+            if (!editingProjectId) return;
+            const newName = document.getElementById('editPname').value.trim();
+            if (!newName) return;
+
+            try {
+                await fetch(`/api/projects/${editingProjectId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ name: newName })
+                });
+                document.getElementById('modEditProject').style.display = 'none';
+                loadProjects();
+
+                if (activeProjectId === editingProjectId) {
+                    document.getElementById('activeProjectLabel').textContent = `[ ${newName} ]`;
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Ошибка переименования");
+            }
+        }
+
+        async function changeProjectFolder() {
+            if (!editingProjectId) return;
+            try {
+                const dirHandle = await window.showDirectoryPicker();
+                const folderPath = dirHandle.name;
+
+                await fetch(`/api/projects/${editingProjectId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ folder_path: folderPath })
+                });
+
+                await set(`roode_handle_${editingProjectId}`, dirHandle);
+
+                document.getElementById('modEditProject').style.display = 'none';
+                loadProjects();
+
+                if (activeProjectId === editingProjectId) {
+                    openProject(editingProjectId);
+                } else {
+                    notify("Папка проекта изменена");
+                }
+            } catch (e) {
+                console.log("Folder change cancelled", e);
+            }
         }
 
         async function createProject() {
@@ -1076,6 +1156,9 @@
         window.showNewProject = showNewProject;
         window.createProject = createProject;
         window.deleteProject = deleteProject;
+        window.openEditProject = openEditProject;
+        window.saveEditProject = saveEditProject;
+        window.changeProjectFolder = changeProjectFolder;
         window.openProject = openProject;
         window.createFile = createFile;
         window.switchSidebar = switchSidebar;
