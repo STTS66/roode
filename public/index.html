@@ -433,7 +433,12 @@
                 Выйти</button>
             <button class="btn btn-blue" onclick="selFolder()">📂 Папка</button>
             <button class="btn btn-green" onclick="showNewFile()">➕ Файл</button>
-            <button class="btn btn-gray" onclick="save()">💾 Save</button>
+            <div
+                style="display: flex; align-items: center; background: #252526; padding: 0 8px; border-radius: 3px; border: 1px solid #444;">
+                <input type="checkbox" id="autoSaveCheck" style="margin-right: 5px; cursor: pointer;">
+                <label for="autoSaveCheck" style="font-size: 11px; cursor: pointer; color: #ccc;">Auto-save</label>
+            </div>
+            <button class="btn btn-gray" onclick="save()" id="btnSaveMain">💾 Save</button>
             <button class="btn btn-gray" style="font-size: 14px; font-weight: bold; padding: 2px 10px;"
                 onclick="toggleMenu(event)">•••</button>
             <div id="mainMenu" class="dropdown">
@@ -548,6 +553,7 @@
         let filesCache = [];
         let projectMemory = {};
         let isCreating = false;
+        let autoSaveTimer = null;
 
         // Auth State
         let token = localStorage.getItem('roode_token');
@@ -651,6 +657,12 @@
             }
         }
 
+        const autoSaveBox = document.getElementById('autoSaveCheck');
+        autoSaveBox.checked = localStorage.getItem('roode_autosave') === 'true';
+        autoSaveBox.addEventListener('change', (e) => {
+            localStorage.setItem('roode_autosave', e.target.checked);
+        });
+
         // Numbers & Events
         function updateLines() {
             if (!ed.value) { gut.innerHTML = `<div class="line-num">1</div>`; return; }
@@ -662,6 +674,13 @@
         ed.addEventListener('input', () => {
             updateLines();
             if (!isDir && fileH) projectMemory[fileH.name] = ed.value;
+
+            if (autoSaveBox.checked && fileH) {
+                clearTimeout(autoSaveTimer);
+                autoSaveTimer = setTimeout(() => {
+                    save(true);
+                }, 1000); // 1 second debounce
+            }
         });
         ed.addEventListener('scroll', () => { gut.scrollTop = ed.scrollTop; });
         ed.addEventListener('keydown', () => setTimeout(updateLines, 0));
@@ -952,13 +971,13 @@
             tab.textContent = h.name; msg.textContent = h.name; updateLines();
         }
 
-        async function save() {
+        async function save(isSilent = false) {
             if (isDir) {
-                if (!fileH) return alert('Нет файла');
+                if (!fileH) return !isSilent && alert('Нет файла');
                 const w = await fileH.createWritable(); await w.write(ed.value); await w.close();
-                notify(`Saved: ${fileH.name}`);
+                if (!isSilent) notify(`Saved: ${fileH.name}`);
             } else {
-                if (filesCache.length === 0) return alert("Пусто");
+                if (filesCache.length === 0) return !isSilent && alert("Пусто");
                 if (fileH) projectMemory[fileH.name] = ed.value;
                 try {
                     let c = 0;
@@ -966,8 +985,8 @@
                         const ct = projectMemory[h.name];
                         if (ct !== undefined) { const w = await h.createWritable(); await w.write(ct); await w.close(); c++; }
                     }
-                    notify(`✅ Updated ${c} files`);
-                } catch (e) { alert("Err: " + e.message); }
+                    if (!isSilent) notify(`✅ Updated ${c} files`);
+                } catch (e) { !isSilent && alert("Err: " + e.message); }
             }
         }
 
