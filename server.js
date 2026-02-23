@@ -1,10 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { pool, initDB } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-roode-key';
 
 // Middleware
 app.use(cors());
@@ -12,6 +15,59 @@ app.use(express.json());
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// --- AUTH ROUTES ---
+
+app.post('/api/auth/register', async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const result = await pool.query(
+            'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username',
+            [username, hashedPassword]
+        );
+        res.status(201).json({ message: 'User created' });
+    } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ error: 'Username already exists' });
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        const user = result.rows[0];
+
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token, username: user.username });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Middleware to verify JWT
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(401).json({ error: 'Access denied' });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ error: 'Invalid token' });
+        req.user = user;
+        next();
+    });
+}
 
 // --- API ROUTES ---
 
@@ -21,9 +77,9 @@ app.get('/ping', (req, res) => {
 });
 
 // Get all projects
-app.get('/api/projects', async (req, res) => {
+app.get('/api/projects', authenticateToken, async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM projects ORDER BY created_at DESC');
+        const result = await pool.query('SELECT * FROM projects WHERE user_id = $1 ORDER BY created_at DESC', [req.user.userId]);
         res.json(result.rows);
     } catch (err) {
         console.error(err);
@@ -32,7 +88,7 @@ app.get('/api/projects', async (req, res) => {
 });
 
 // Create a new project
-app.post('/api/projects', async (req, res) => {
+app.post('/api/projects', authenticateToken, async (req, res) => {
     const { name, folder_path } = req.body;
     if (!name || !folder_path) {
         return res.status(400).json({ error: 'Name and folder_path are required' });
@@ -40,8 +96,8 @@ app.post('/api/projects', async (req, res) => {
 
     try {
         const result = await pool.query(
-            'INSERT INTO projects (name, folder_path) VALUES ($1, $2) RETURNING *',
-            [name, folder_path]
+            'INSERT INTO projects (user_id, name, folder_path) VALUES ($1, $2, $3) RETURNING *',
+            [req.user.userId, name, folder_path]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -51,17 +107,17 @@ app.post('/api/projects', async (req, res) => {
 });
 
 // Update last opened file for a project
-app.patch('/api/projects/:id/last-file', async (req, res) => {
+app.patch('/api/projects/:id/last-file', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { last_file } = req.body;
 
     try {
         const result = await pool.query(
-            'UPDATE projects SET last_file = $1 WHERE id = $2 RETURNING *',
-            [last_file, id]
+            'UPDATE projects SET last_file = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
+            [last_file, id, req.user.userId]
         );
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Project not found' });
+            return res.status(404).json({ error: 'Project not found or unauthorized' });
         }
         res.json(result.rows[0]);
     } catch (err) {
@@ -71,13 +127,13 @@ app.patch('/api/projects/:id/last-file', async (req, res) => {
 });
 
 // Delete a project
-app.delete('/api/projects/:id', async (req, res) => {
+app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        const result = await pool.query('DELETE FROM projects WHERE id = $1 RETURNING *', [id]);
+        const result = await pool.query('DELETE FROM projects WHERE id = $1 AND user_id = $2 RETURNING *', [id, req.user.userId]);
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Project not found' });
+            return res.status(404).json({ error: 'Project not found or unauthorized' });
         }
         res.json({ message: 'Project deleted successfully' });
     } catch (err) {

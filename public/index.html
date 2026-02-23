@@ -427,6 +427,10 @@
     <header>
         <div class="logo">Roode <span style="font-size:10px;opacity:0.5">2.5</span></div>
         <div class="controls">
+            <span id="userGreeting"
+                style="font-size: 11px; margin-right: 10px; opacity: 0.8; display: none; align-items: center;"></span>
+            <button class="btn btn-gray" id="btnLogout" onclick="logout()" style="display: none; margin-right: 5px;">🚪
+                Выйти</button>
             <button class="btn btn-blue" onclick="selFolder()">📂 Папка</button>
             <button class="btn btn-green" onclick="showNewFile()">➕ Файл</button>
             <button class="btn btn-gray" onclick="save()">💾 Save</button>
@@ -518,6 +522,24 @@
         </div>
     </div>
 
+    <!-- AUTH MODAL -->
+    <div class="overlay" id="modAuth" style="z-index: 1000; background: rgba(0,0,0,0.85);">
+        <div class="modal" id="authBox">
+            <h3 id="authTitle" style="margin-top:0">Вход</h3>
+            <div id="authError" style="color: #f44; font-size: 12px; margin-bottom: 10px; display: none;"></div>
+            <input id="authUsername" placeholder="Логин">
+            <input id="authPassword" type="password" placeholder="Пароль">
+            <div class="modal-buttons" style="flex-direction: column;">
+                <button class="btn btn-blue" id="authBtn" onclick="doAuth()" style="width: 100%;">Войти</button>
+                <div style="font-size: 12px; color: #aaa; margin-top: 10px; cursor: pointer;"
+                    onclick="toggleAuthMode()">
+                    Нет аккаунта? <span
+                        style="color: var(--accent-color); text-decoration: underline;">Зарегистрироваться</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { get, set, del } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 
@@ -525,6 +547,11 @@
         let filesCache = [];
         let projectMemory = {};
         let isCreating = false;
+
+        // Auth State
+        let token = localStorage.getItem('roode_token');
+        let username = localStorage.getItem('roode_username');
+        let isLoginMode = true;
 
         // Projects State
         let projectsList = [];
@@ -537,6 +564,74 @@
         const tab = document.getElementById('tabInfo');
         const label = document.getElementById('labelHeader');
         const menu = document.getElementById('mainMenu');
+
+        // --- AUTH LOGIC ---
+        function checkAuth() {
+            if (!token) {
+                document.getElementById('modAuth').style.display = 'flex';
+                document.getElementById('authUsername').focus();
+            } else {
+                document.getElementById('modAuth').style.display = 'none';
+                document.getElementById('btnLogout').style.display = 'flex';
+                document.getElementById('userGreeting').style.display = 'flex';
+                document.getElementById('userGreeting').textContent = `Привет, ${username}!`;
+                loadProjects();
+            }
+        }
+
+        window.toggleAuthMode = function () {
+            isLoginMode = !isLoginMode;
+            document.getElementById('authTitle').textContent = isLoginMode ? 'Вход' : 'Регистрация';
+            document.getElementById('authBtn').textContent = isLoginMode ? 'Войти' : 'Зарегистрироваться';
+            document.querySelector('#modAuth .modal-buttons div').innerHTML = isLoginMode ?
+                `Нет аккаунта? <span style="color: var(--accent-color); text-decoration: underline;">Зарегистрироваться</span>` :
+                `Уже есть аккаунт? <span style="color: var(--accent-color); text-decoration: underline;">Войти</span>`;
+            document.getElementById('authError').style.display = 'none';
+        }
+
+        window.doAuth = async function () {
+            const u = document.getElementById('authUsername').value.trim();
+            const p = document.getElementById('authPassword').value.trim();
+            const errBox = document.getElementById('authError');
+
+            if (!u || !p) { errBox.textContent = 'Введите логин и пароль'; errBox.style.display = 'block'; return; }
+
+            try {
+                const endpoint = isLoginMode ? '/api/auth/login' : '/api/auth/register';
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Ошибка авторизации');
+
+                if (!isLoginMode) {
+                    errBox.style.color = '#4caf50';
+                    errBox.textContent = 'Успешно! Теперь войдите.';
+                    errBox.style.display = 'block';
+                    setTimeout(() => { toggleAuthMode(); errBox.style.display = 'none'; errBox.style.color = '#f44'; }, 1500);
+                } else {
+                    token = data.token;
+                    username = data.username;
+                    localStorage.setItem('roode_token', token);
+                    localStorage.setItem('roode_username', username);
+                    checkAuth();
+                }
+            } catch (e) {
+                errBox.style.color = '#f44';
+                errBox.textContent = e.message;
+                errBox.style.display = 'block';
+            }
+        }
+
+        window.logout = function () {
+            if (!confirm('Выйти из аккаунта?')) return;
+            localStorage.removeItem('roode_token');
+            localStorage.removeItem('roode_username');
+            location.reload();
+        }
 
         // UI Switches
         function switchSidebar(view) {
@@ -580,7 +675,10 @@
 
         async function loadProjects() {
             try {
-                const res = await fetch('/api/projects');
+                const res = await fetch('/api/projects', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.status === 401 || res.status === 403) { window.logout(); return; }
                 projectsList = await res.json();
                 renderProjects();
             } catch (e) {
@@ -631,7 +729,7 @@
 
                 const res = await fetch('/api/projects', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ name, folder_path: folderPath })
                 });
                 const newProj = await res.json();
@@ -659,7 +757,10 @@
             if (!confirm('Удалить проект из базы? Файлы на диске останутся.')) return;
 
             try {
-                await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+                await fetch(`/api/projects/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 await del(`roode_handle_${id}`); // Delete handle from IndexedDB
 
                 if (activeProjectId === id) {
@@ -840,7 +941,7 @@
             if (activeProjectId) {
                 fetch(`/api/projects/${activeProjectId}/last-file`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ last_file: h.name })
                 }).catch(e => console.log(e));
             }
@@ -947,7 +1048,7 @@
         window.switchSidebar = switchSidebar;
 
         updateLines();
-        loadProjects(); // Preload projects from backend
+        checkAuth(); // Kick off flow, either shows logic or loads projects
 
     </script>
 </body>
