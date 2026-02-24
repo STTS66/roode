@@ -1096,6 +1096,74 @@
                 document.getElementById('btnCollab').textContent = "🔴 Online (Выйти)";
                 document.getElementById('btnCollab').style.backgroundColor = "#ff6b6b";
                 notify("Подключено к совместной сессии");
+
+                // Request the project files if joining
+                socket.emit('request-project', activeRoom);
+            });
+
+            socket.on('request-project', (requesterId) => {
+                // If we are the host with open files, send them
+                if (fHandle || filesCache.length > 0) {
+                    const sendData = async () => {
+                        let files = [];
+                        if (isDir && fHandle) {
+                            for await (const [n, h] of fHandle.entries()) {
+                                if (h.kind === 'file' && n.toUpperCase().match(/\.(PRSH|PRSHX|TXT)$/)) files.push(n);
+                            }
+                        } else {
+                            files = filesCache.map(f => f.name);
+                        }
+
+                        let pName = document.getElementById('activeProjectLabel').textContent;
+                        pName = pName.replace(/[\[\]]/g, '').trim();
+                        if (pName === 'No Project') pName = 'Совместный файл';
+
+                        socket.emit('project-data', {
+                            roomId: activeRoom,
+                            targetId: requesterId,
+                            projectName: pName,
+                            files: files
+                        });
+                    };
+                    sendData();
+                }
+            });
+
+            socket.on('project-data', (data) => {
+                // If we don't have our own files open, accept the remote project tree
+                if (!fHandle && filesCache.length === 0) {
+                    isDir = false;
+                    label.textContent = "ОБЩИЕ ФАЙЛЫ";
+                    document.getElementById('activeProjectLabel').textContent = `[ ${data.projectName} ]`;
+                    document.getElementById('activeProjectLabel').style.color = "#03a9f4";
+                    document.getElementById('activeProjectStatus').style.backgroundColor = "#03a9f4";
+                    document.getElementById('activeProjectStatus').style.boxShadow = "0 0 8px #03a9f4";
+
+                    filesCache = data.files.map(name => ({ name: name, isRemote: true, kind: 'file' }));
+                    listRender();
+                    switchSidebar('explorer');
+                    notify(`Получен доступ к проекту ${data.projectName}`);
+                }
+            });
+
+            socket.on('request-file', async (data) => {
+                // If we are host, serve the file content requested by guest
+                let content = projectMemory[data.file];
+                if (content === undefined && isDir && fHandle) {
+                    try {
+                        for await (const [n, h] of fHandle.entries()) {
+                            if (n === data.file && h.kind === 'file') {
+                                const f = await h.getFile();
+                                content = await f.text();
+                                projectMemory[data.file] = content;
+                                break;
+                            }
+                        }
+                    } catch (e) { }
+                }
+                if (content !== undefined) {
+                    socket.emit('code-update', { roomId: activeRoom, file: data.file, content: content });
+                }
             });
 
             socket.on('code-update', (data) => {
@@ -1635,8 +1703,19 @@
                 }).catch(e => console.log(e));
             }
 
-            if (isDir) { const f = await h.getFile(); ed.value = await f.text(); }
-            else { ed.value = projectMemory[h.name] || ""; }
+            if (isDir) {
+                const f = await h.getFile();
+                ed.value = await f.text();
+            } else {
+                if (h.isRemote) {
+                    ed.value = projectMemory[h.name] !== undefined ? projectMemory[h.name] : "// Загрузка по сети...";
+                    if (projectMemory[h.name] === undefined && socket) {
+                        socket.emit('request-file', { roomId: activeRoom, file: h.name });
+                    }
+                } else {
+                    ed.value = projectMemory[h.name] || "";
+                }
+            }
 
             msg.textContent = h.name;
             renderTabs();

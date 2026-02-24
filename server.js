@@ -249,6 +249,24 @@ io.on('connection', (socket) => {
             socket.to(socket.roomId).emit('user-left', { id: socket.id, username: socket.username });
         }
     });
+
+    // Handle Project Tree Sync Events
+    socket.on('request-project', (roomId) => {
+        socket.to(roomId).emit('request-project', socket.id);
+    });
+
+    socket.on('project-data', (data) => {
+        if (data.targetId) {
+            socket.to(data.targetId).emit('project-data', data);
+        } else {
+            socket.to(data.roomId).emit('project-data', data);
+        }
+    });
+
+    socket.on('request-file', (data) => {
+        // Broadcasts to room, host will intercept and send code-update
+        socket.to(data.roomId).emit('request-file', data);
+    });
 });
 
 // Initialize DB and start server
