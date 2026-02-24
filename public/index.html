@@ -9,17 +9,111 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
+            /* Default Dark Theme (VS Code Dark+ inspired) */
             --bg-color: #1e1e1e;
             --sidebar-color: #252526;
+            --tab-bg: #1e1e1e;
+            --tab-inactive: #2d2d2d;
+            --tab-active-bg: #1e1e1e;
             --text-color: #d4d4d4;
             --accent-color: #007acc;
             --line-number-color: #858585;
-            --header-height: 40px;
+            --header-bg: #333333;
+            --border-color: #333333;
+            --hover-bg: #2a2d2e;
+            --menu-bg: #252526;
             --menu-hover: #094771;
+            --input-bg: #3c3c3c;
 
+            /* Syntax Highlighting */
+            --token-kw: #569cd6;
+            --token-str: #ce9178;
+            --token-num: #b5cea8;
+            --token-cmt: #6a9955;
+            --token-op: #d4d4d4;
+
+            --header-height: 40px;
             --editor-font: 'Consolas', 'Monaco', 'Courier New', monospace;
             --editor-size: 14px;
             --editor-line-height: 20px;
+        }
+
+        body.theme-light {
+            /* Light Theme (VS Code Light+ inspired) */
+            --bg-color: #ffffff;
+            --sidebar-color: #f3f3f3;
+            --tab-bg: #ececec;
+            --tab-inactive: #e8e8e8;
+            --tab-active-bg: #ffffff;
+            --text-color: #333333;
+            --accent-color: #007acc;
+            --line-number-color: #237893;
+            --header-bg: #dddddd;
+            --border-color: #cccccc;
+            --hover-bg: #e4e6f1;
+            --menu-bg: #f3f3f3;
+            --menu-hover: #0060a0;
+            --input-bg: #ffffff;
+
+            /* Syntax Highlighting Light */
+            --token-kw: #0000ff;
+            --token-str: #a31515;
+            --token-num: #098658;
+            --token-cmt: #008000;
+            --token-op: #333333;
+        }
+
+        body.theme-hc {
+            /* High Contrast Theme */
+            --bg-color: #000000;
+            --sidebar-color: #000000;
+            --tab-bg: #000000;
+            --tab-inactive: #000000;
+            --tab-active-bg: #000000;
+            --text-color: #ffffff;
+            --accent-color: #ffcc00;
+            /* Yellow accent */
+            --line-number-color: #ffffff;
+            --header-bg: #000000;
+            --border-color: #6fc3df;
+            /* High contrast cyan borders */
+            --hover-bg: #ffffff;
+            --menu-bg: #000000;
+            --menu-hover: #ffffff;
+            --input-bg: #000000;
+
+            /* Syntax Highlighting High Contrast */
+            --token-kw: #569cd6;
+            --token-str: #ce9178;
+            --token-num: #b5cea8;
+            --token-cmt: #6a9955;
+            --token-op: #ffffff;
+        }
+
+        /* Ensure High Contrast mode borders are prominent */
+        body.theme-hc .sidebar,
+        body.theme-hc .sidebar-tabs,
+        body.theme-hc header,
+        body.theme-hc .tab,
+        body.theme-hc .gutter,
+        body.theme-hc .modal,
+        body.theme-hc .dropdown,
+        body.theme-hc .font-controls,
+        body.theme-hc .modal input {
+            border-color: var(--border-color) !important;
+            border-width: 1px !important;
+            border-style: solid !important;
+        }
+
+        body.theme-hc .tab.active {
+            border-top: 2px solid var(--accent-color) !important;
+        }
+
+        body.theme-hc .file-item:hover,
+        body.theme-hc .project-item:hover,
+        body.theme-hc .dropdown-item:hover {
+            background-color: var(--hover-bg);
+            color: #000000 !important;
         }
 
         body {
@@ -37,12 +131,12 @@
         /* HEADER */
         header {
             height: var(--header-height);
-            background: #333;
+            background: var(--header-bg);
             display: flex;
             align-items: center;
             padding: 0 10px;
             justify-content: space-between;
-            border-bottom: 1px solid #111;
+            border-bottom: 1px solid var(--border-color);
             user-select: none;
             z-index: 20;
         }
@@ -55,7 +149,7 @@
 
         .logo {
             font-weight: bold;
-            color: white;
+            color: var(--text-color);
             margin-right: 10px;
             font-size: 14px;
         }
@@ -90,11 +184,13 @@
         }
 
         .btn-gray {
-            background: #444;
+            background: var(--border-color);
+            color: var(--text-color);
         }
 
         .btn-gray:hover {
-            background: #555;
+            background: var(--hover-bg);
+            color: var(--text-color);
         }
 
         /* MENU */
@@ -102,8 +198,8 @@
             position: absolute;
             top: 30px;
             right: 0;
-            background: #252526;
-            border: 1px solid #454545;
+            background: var(--menu-bg);
+            border: 1px solid var(--border-color);
             border-radius: 4px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
             display: none;
@@ -120,8 +216,8 @@
             padding: 8px 12px;
             font-size: 12px;
             cursor: pointer;
-            color: #ccc;
-            border-bottom: 1px solid #333;
+            color: var(--text-color);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .dropdown-item:last-child {
@@ -143,15 +239,15 @@
         .sidebar {
             width: 250px;
             background: var(--sidebar-color);
-            border-right: 1px solid #333;
+            border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
         }
 
         .sidebar-tabs {
             display: flex;
-            background: #2b2b2c;
-            border-bottom: 1px solid #111;
+            background: var(--tab-inactive);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .sidebar-tab {
@@ -166,9 +262,9 @@
         }
 
         .sidebar-tab.active {
-            color: #fff;
+            color: var(--text-color);
             border-bottom-color: var(--accent-color);
-            background: #333;
+            background: var(--sidebar-color);
         }
 
         .sidebar-header {
@@ -196,19 +292,19 @@
             justify-content: space-between;
             align-items: center;
             font-size: 13px;
-            color: #ccc;
+            color: var(--text-color);
             cursor: pointer;
             border-left: 3px solid transparent;
         }
 
         .file-item:hover {
-            background: #2a2d2e;
+            background: var(--hover-bg);
         }
 
         .file-item.active {
-            background: #37373d;
+            background: var(--hover-bg);
             border-left-color: var(--accent-color);
-            color: #fff;
+            color: var(--text-color);
         }
 
         .project-item {
@@ -217,20 +313,20 @@
             justify-content: space-between;
             align-items: center;
             font-size: 13px;
-            color: #ccc;
+            color: var(--text-color);
             cursor: pointer;
             border-left: 3px solid transparent;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .project-item:hover {
-            background: #2a2d2e;
+            background: var(--hover-bg);
         }
 
         .project-item.active {
-            background: #37373d;
+            background: var(--hover-bg);
             border-left-color: var(--accent-color);
-            color: #fff;
+            color: var(--text-color);
         }
 
         .project-info {
@@ -290,7 +386,7 @@
 
         .tab-bar {
             height: 35px;
-            background: #252526;
+            background: var(--tab-bg);
             display: flex;
             align-items: center;
         }
@@ -300,24 +396,24 @@
             height: 100%;
             display: flex;
             align-items: center;
-            background: #1e1e1e;
+            background: var(--tab-inactive);
             font-size: 13px;
-            color: #888;
+            color: var(--text-color);
             border-top: 2px solid transparent;
-            border-right: 1px solid #333;
+            border-right: 1px solid var(--border-color);
             cursor: pointer;
             gap: 8px;
             user-select: none;
         }
 
         .tab:hover {
-            background: #2a2d2e;
+            background: var(--hover-bg);
         }
 
         .tab.active {
-            color: #fff;
-            background: var(--bg-color);
+            background: var(--tab-active-bg);
             border-top-color: var(--accent-color);
+            color: var(--text-color);
         }
 
         .tab-close {
@@ -340,10 +436,10 @@
         .gutter {
             width: 45px;
             flex-shrink: 0;
-            background: #1e1e1e;
+            background: var(--bg-color);
             color: var(--line-number-color);
             text-align: right;
-            border-right: 1px solid #333;
+            border-right: 1px solid var(--border-color);
             user-select: none;
             overflow: hidden;
             padding-top: 10px;
@@ -539,6 +635,14 @@
                 style="display: flex; align-items: center; background: #252526; padding: 0 8px; border-radius: 3px; border: 1px solid #444;">
                 <input type="checkbox" id="autoSaveCheck" style="margin-right: 5px; cursor: pointer;">
                 <label for="autoSaveCheck" style="font-size: 11px; cursor: pointer; color: #ccc;">Auto-save</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <select id="themeSelect" onchange="changeTheme()"
+                    style="background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 3px; font-size: 11px; padding: 2px;">
+                    <option value="dark">Тёмная</option>
+                    <option value="light">Светлая</option>
+                    <option value="hc">Контраст</option>
+                </select>
             </div>
             <div class="font-controls">
                 <button onclick="changeFontSize(-1)">A-</button>
@@ -842,6 +946,23 @@
             updateLines();
         };
         applyFontSize();
+
+        // Theme Logic
+        let currentTheme = localStorage.getItem('roode_theme') || 'dark';
+        function applyTheme() {
+            document.body.className = '';
+            if (currentTheme !== 'dark') {
+                document.body.classList.add('theme-' + currentTheme);
+            }
+            const sel = document.getElementById('themeSelect');
+            if (sel) sel.value = currentTheme;
+        }
+        window.changeTheme = function () {
+            currentTheme = document.getElementById('themeSelect').value;
+            localStorage.setItem('roode_theme', currentTheme);
+            applyTheme();
+        };
+        applyTheme();
 
         // Cursor Stats
         function updateCursorStats() {
@@ -1437,6 +1558,7 @@
         window.createFile = createFile;
         window.switchSidebar = switchSidebar;
         window.updateCursorStats = updateCursorStats;
+        window.changeTheme = changeTheme;
 
         updateLines();
         checkAuth(); // Kick off flow, either shows logic or loads projects
