@@ -583,6 +583,7 @@
         let projectsList = [];
         let activeProjectId = null;
         let editingProjectId = null;
+        let serverLastProjectId = null; // from server on login
 
         const ed = document.getElementById('editor');
         const gut = document.getElementById('gutter');
@@ -593,7 +594,16 @@
         const menu = document.getElementById('mainMenu');
 
         // --- AUTH LOGIC ---
-        function checkAuth() {
+
+        function saveLastProjectToServer(projectId) {
+            fetch('/api/auth/last-project', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ last_project_id: projectId })
+            }).catch(e => console.log('Failed to save last project', e));
+        }
+
+        async function checkAuth() {
             if (!token) {
                 document.getElementById('modAuth').style.display = 'flex';
                 document.getElementById('authUsername').focus();
@@ -602,6 +612,20 @@
                 document.getElementById('btnLogout').style.display = 'flex';
                 document.getElementById('userGreeting').style.display = 'flex';
                 document.getElementById('userGreeting').textContent = `Привет, ${username}!`;
+
+                // On page reload (not fresh login), fetch last_project_id from server
+                if (!serverLastProjectId) {
+                    try {
+                        const uRes = await fetch('/api/auth/me', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (uRes.ok) {
+                            const uData = await uRes.json();
+                            serverLastProjectId = uData.last_project_id;
+                        }
+                    } catch (e) { console.log(e); }
+                }
+
                 loadProjects();
             }
         }
@@ -642,6 +666,7 @@
                 } else {
                     token = data.token;
                     username = data.username;
+                    serverLastProjectId = data.last_project_id;
                     localStorage.setItem('roode_token', token);
                     localStorage.setItem('roode_username', username);
                     checkAuth();
@@ -723,11 +748,11 @@
                 renderProjects();
 
                 // Auto-load last active project on startup
-                if (!activeProjectId) {
-                    const lastProjectId = localStorage.getItem('roode_last_project');
-                    if (lastProjectId && projectsList.some(p => p.id == lastProjectId)) {
-                        await openProject(Number(lastProjectId), true); // true = silent/startup mode
+                if (!activeProjectId && serverLastProjectId) {
+                    if (projectsList.some(p => p.id == serverLastProjectId)) {
+                        await openProject(Number(serverLastProjectId), true);
                     }
+                    serverLastProjectId = null; // only use once on startup
                 }
             } catch (e) {
                 console.error(e);
@@ -873,7 +898,7 @@
 
                 if (activeProjectId === id) {
                     activeProjectId = null;
-                    localStorage.removeItem('roode_last_project');
+                    saveLastProjectToServer(null);
                     document.getElementById('activeProjectLabel').textContent = "No Project";
                     document.getElementById('activeProjectStatus').style.backgroundColor = "#f44";
                 }
@@ -923,7 +948,7 @@
                 fHandle = handle;
                 isDir = true;
                 activeProjectId = proj.id;
-                localStorage.setItem('roode_last_project', proj.id);
+                saveLastProjectToServer(proj.id);
 
                 loadWorkspaceFromHandle(proj.name);
 

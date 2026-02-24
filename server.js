@@ -48,7 +48,31 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
-        res.json({ token, username: user.username });
+        res.json({ token, username: user.username, last_project_id: user.last_project_id });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Save last active project to user profile
+app.patch('/api/auth/last-project', authenticateToken, async (req, res) => {
+    const { last_project_id } = req.body;
+    try {
+        await pool.query('UPDATE users SET last_project_id = $1 WHERE id = $2', [last_project_id, req.user.userId]);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Get current user info (for page reload)
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, username, last_project_id FROM users WHERE id = $1', [req.user.userId]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+        res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });

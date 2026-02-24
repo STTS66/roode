@@ -36,6 +36,13 @@ async function initDB() {
       // Ignore error if column already exists
     }
 
+    // Add last_project_id to users table
+    try {
+      await client.query('ALTER TABLE users ADD COLUMN last_project_id INTEGER');
+    } catch (e) {
+      // Ignore if already exists
+    }
+
     console.log('✅ DB ready (users & projects tables exist)');
   } finally {
     client.release();
