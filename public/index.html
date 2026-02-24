@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roode v2.5 (Projects & Sync)</title>
+    <!-- JSZip for exporting projects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
             --bg-color: #1e1e1e;
@@ -300,7 +302,32 @@
             align-items: center;
             background: #1e1e1e;
             font-size: 13px;
-            border-top: 2px solid var(--accent-color);
+            color: #888;
+            border-top: 2px solid transparent;
+            border-right: 1px solid #333;
+            cursor: pointer;
+            gap: 8px;
+            user-select: none;
+        }
+
+        .tab:hover {
+            background: #2a2d2e;
+        }
+
+        .tab.active {
+            color: #fff;
+            background: var(--bg-color);
+            border-top-color: var(--accent-color);
+        }
+
+        .tab-close {
+            font-size: 14px;
+            color: #666;
+            line-height: 1;
+        }
+
+        .tab-close:hover {
+            color: #f44;
         }
 
         .code-wrapper {
@@ -331,13 +358,16 @@
             padding-right: 8px;
         }
 
-        textarea#editor {
+        textarea#editor,
+        #highlighting {
             flex: 1;
             background: transparent;
+            margin: 0;
             border: none;
             outline: none;
             resize: none;
-            color: var(--text-color);
+            color: transparent;
+            /* Text in textarea shouldn't be visible, only cursor/selection */
             padding: 10px;
             box-sizing: border-box;
             font-family: var(--editor-font);
@@ -347,6 +377,47 @@
             white-space: pre;
             overflow-x: scroll;
             overflow-y: scroll;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* The real text color goes to the highlight div behind the textarea */
+        #highlighting {
+            z-index: 1;
+            color: var(--text-color);
+            pointer-events: none;
+            /* Let clicks pass through to textarea */
+        }
+
+        textarea#editor {
+            z-index: 2;
+            caret-color: #fff;
+        }
+
+        /* Syntax colors */
+        .token-keyword {
+            color: #569cd6;
+            font-weight: bold;
+        }
+
+        .token-string {
+            color: #ce9178;
+        }
+
+        .token-number {
+            color: #b5cea8;
+        }
+
+        .token-comment {
+            color: #6a9955;
+            font-style: italic;
+        }
+
+        .token-operator {
+            color: #d4d4d4;
         }
 
         ::-webkit-scrollbar {
@@ -419,6 +490,37 @@
             gap: 10px;
             margin-top: 15px;
         }
+
+        .font-controls {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            background: #252526;
+            border-radius: 3px;
+            border: 1px solid #444;
+            padding: 0 4px;
+        }
+
+        .font-controls button {
+            background: none;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 5px;
+            line-height: 1;
+        }
+
+        .font-controls button:hover {
+            color: #fff;
+        }
+
+        .font-controls span {
+            font-size: 10px;
+            color: #888;
+            min-width: 24px;
+            text-align: center;
+        }
     </style>
 </head>
 
@@ -438,12 +540,18 @@
                 <input type="checkbox" id="autoSaveCheck" style="margin-right: 5px; cursor: pointer;">
                 <label for="autoSaveCheck" style="font-size: 11px; cursor: pointer; color: #ccc;">Auto-save</label>
             </div>
+            <div class="font-controls">
+                <button onclick="changeFontSize(-1)">A-</button>
+                <span id="fontSizeLabel">14</span>
+                <button onclick="changeFontSize(1)">A+</button>
+            </div>
             <button class="btn btn-gray" onclick="save()" id="btnSaveMain">💾 Save</button>
             <button class="btn btn-gray" style="font-size: 14px; font-weight: bold; padding: 2px 10px;"
                 onclick="toggleMenu(event)">•••</button>
             <div id="mainMenu" class="dropdown">
                 <div class="dropdown-item" onclick="saveAs()">Сохранить как...</div>
                 <div class="dropdown-item" onclick="exportTxt()">Скачать .txt</div>
+                <div class="dropdown-item" onclick="exportZip()">📦 Экспорт ZIP</div>
                 <div class="dropdown-item" style="color:#ff6b6b" onclick="closeAll()">Закрыть всё</div>
             </div>
         </div>
@@ -478,23 +586,29 @@
             </div>
         </div>
         <div class="editor-container">
-            <div class="tab-bar">
-                <div class="tab" id="tabInfo">...</div>
+            <div class="tab-bar" id="tabBarContainer">
+                <!-- Tabs rendered here dynamically -->
             </div>
             <div class="code-wrapper">
                 <div id="gutter" class="gutter"></div>
-                <textarea id="editor" spellcheck="false"
-                    placeholder="// Roode v2.5 (Projects & Cloud Sync - Node.js Backend)"></textarea>
+                <div style="position: relative; flex: 1; overflow: hidden;">
+                    <pre id="highlighting" aria-hidden="true"><code></code></pre>
+                    <textarea id="editor" spellcheck="false"
+                        placeholder="// Roode v2.5 (Projects & Cloud Sync - Node.js Backend)"></textarea>
+                </div>
             </div>
         </div>
     </div>
 
     <footer>
         <div id="msg">Готов</div>
-        <div id="activeProjectContainer" style="display: flex; align-items: center; gap: 8px;">
-            <div id="activeProjectStatus" style="width: 8px; height: 8px; border-radius: 50%; background-color: #f44;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span id="cursorInfo" style="opacity: 0.9;">Ln 1, Col 1 | 0 chars</span>
+            <div id="activeProjectContainer" style="display: flex; align-items: center; gap: 8px;">
+                <div id="activeProjectStatus"
+                    style="width: 8px; height: 8px; border-radius: 50%; background-color: #f44;"></div>
+                <div id="activeProjectLabel" style="font-weight: bold; letter-spacing: 0.5px;">No Project</div>
             </div>
-            <div id="activeProjectLabel" style="font-weight: bold; letter-spacing: 0.5px;">No Project</div>
         </div>
     </footer>
 
@@ -585,11 +699,15 @@
         let editingProjectId = null;
         let serverLastProjectId = null; // from server on login
 
+        // Tabs State
+        let openTabs = [];
+
         const ed = document.getElementById('editor');
+        const hl = document.getElementById('highlighting').querySelector('code');
         const gut = document.getElementById('gutter');
         const ui = document.getElementById('listUI');
         const msg = document.getElementById('msg');
-        const tab = document.getElementById('tabInfo');
+        const tabBar = document.getElementById('tabBarContainer');
         const label = document.getElementById('labelHeader');
         const menu = document.getElementById('mainMenu');
 
@@ -708,6 +826,34 @@
             localStorage.setItem('roode_autosave', e.target.checked);
         });
 
+        // Font Size Logic
+        let currentFontSize = parseInt(localStorage.getItem('roode_font_size')) || 14;
+        function applyFontSize() {
+            document.documentElement.style.setProperty('--editor-size', currentFontSize + 'px');
+            document.documentElement.style.setProperty('--editor-line-height', (currentFontSize + 6) + 'px');
+            document.getElementById('fontSizeLabel').textContent = currentFontSize;
+        }
+        window.changeFontSize = function (delta) {
+            currentFontSize += delta;
+            if (currentFontSize < 8) currentFontSize = 8;
+            if (currentFontSize > 32) currentFontSize = 32;
+            localStorage.setItem('roode_font_size', currentFontSize);
+            applyFontSize();
+            updateLines();
+        };
+        applyFontSize();
+
+        // Cursor Stats
+        function updateCursorStats() {
+            const val = ed.value;
+            const startPos = ed.selectionStart;
+            const lines = val.substring(0, startPos).split("\n");
+            const currentLine = lines.length;
+            const currentCol = lines[lines.length - 1].length + 1;
+            const totalChars = val.length;
+            document.getElementById('cursorInfo').textContent = `Ln ${currentLine}, Col ${currentCol} | ${totalChars} chars`;
+        }
+
         // Numbers & Events
         function updateLines() {
             if (!ed.value) { gut.innerHTML = `<div class="line-num">1</div>`; return; }
@@ -718,6 +864,8 @@
         }
         ed.addEventListener('input', () => {
             updateLines();
+            updateHighlighting();
+            updateCursorStats();
             if (!isDir && fileH) projectMemory[fileH.name] = ed.value;
 
             if (autoSaveBox.checked && fileH) {
@@ -727,8 +875,35 @@
                 }, 1000); // 1 second debounce
             }
         });
-        ed.addEventListener('scroll', () => { gut.scrollTop = ed.scrollTop; });
+        ed.addEventListener('scroll', () => { gut.scrollTop = ed.scrollTop; document.getElementById('highlighting').scrollTop = ed.scrollTop; document.getElementById('highlighting').scrollLeft = ed.scrollLeft; });
         ed.addEventListener('keydown', () => setTimeout(updateLines, 0));
+        ed.addEventListener('keyup', () => { updateCursorStats(); updateHighlighting(); });
+        ed.addEventListener('click', updateCursorStats);
+
+        function updateHighlighting() {
+            let text = ed.value;
+            // Basic regex-based highlighting
+
+            // 1. Escape HTML first
+            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            // 2. Comments (// and /* */)
+            text = text.replace(/(\/\/[^\n]*|\/\*[\s\S]*?\*\/)/g, '<span class="token-comment">$1</span>');
+
+            // 3. Strings (" " and ' ' and ` `)
+            text = text.replace(/(["'`])(?:(?=(\\?))\2.)*?\1/g, '<span class="token-string">$&</span>');
+
+            // 4. Keywords (var, let, const, function, return, if, else, for, while, async, await etc)
+            const keywords = /\b(var|let|const|function|return|if|else|for|while|async|await|class|try|catch|throw|new|true|false|null|undefined|import|export|from|switch|case|break|continue)\b/g;
+            // Only replace keywords that are NOT already part of a comment or string tag (tricky with regex, keeping it simple for now)
+            // A perfect parser is needed for true syntactic coloring, but this is a good approximation
+            text = text.replace(keywords, '<span class="token-keyword">$1</span>');
+
+            // 5. Numbers
+            text = text.replace(/\b(\d+(\.\d+)?)\b/g, '<span class="token-number">$1</span>');
+
+            hl.innerHTML = text;
+        }
 
         document.getElementById('fname').addEventListener('keydown', e => { if (e.key === 'Enter') createFile(); });
         document.getElementById('pname').addEventListener('keydown', e => { if (e.key === 'Enter') createProject(); });
@@ -1006,6 +1181,39 @@
             a.click();
         }
 
+        async function exportZip() {
+            if (!isDir && filesCache.length === 0) return alert('Нет открытых файлов для экспорта');
+            notify('Архивация...');
+            const zip = new JSZip();
+
+            try {
+                if (isDir && fHandle) {
+                    for await (const [n, h] of fHandle.entries()) {
+                        if (h.kind === 'file') {
+                            const f = await h.getFile();
+                            const txt = await f.text();
+                            zip.file(n, txt);
+                        }
+                    }
+                } else {
+                    for (let h of filesCache) {
+                        const ct = projectMemory[h.name];
+                        if (ct !== undefined) zip.file(h.name, ct);
+                    }
+                }
+
+                const blob = await zip.generateAsync({ type: 'blob' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = (fHandle ? fHandle.name : 'Roode-Export') + '.zip';
+                a.click();
+                notify('Успешно экспортировано');
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка экспорта");
+            }
+        }
+
         function closeAll() {
             if (!confirm("Закрыть всё?")) return;
             projectMemory = {}; filesCache = []; fHandle = null; isDir = false;
@@ -1035,7 +1243,7 @@
             } catch (e) { }
         }
 
-        function resetEd() { fileH = null; ed.value = ''; tab.textContent = "---"; updateLines(); }
+        function resetEd() { fileH = null; ed.value = ''; openTabs = []; renderTabs(); updateLines(); updateHighlighting(); }
 
         async function listRender() {
             ui.innerHTML = '';
@@ -1067,8 +1275,43 @@
             });
         }
 
+        function renderTabs() {
+            tabBar.innerHTML = '';
+            if (openTabs.length === 0) return;
+
+            openTabs.forEach(h => {
+                const isActive = (fileH && fileH.name === h.name);
+                const t = document.createElement('div');
+                t.className = 'tab' + (isActive ? ' active' : '');
+                t.innerHTML = `<span>${h.name}</span><span class="tab-close">×</span>`;
+
+                t.onclick = (e) => {
+                    if (e.target.className === 'tab-close') {
+                        e.stopPropagation();
+                        // Close tab
+                        openTabs = openTabs.filter(x => x.name !== h.name);
+                        if (isActive) {
+                            if (openTabs.length > 0) load(openTabs[openTabs.length - 1]);
+                            else resetEd();
+                        } else {
+                            renderTabs();
+                        }
+                    } else {
+                        load(h);
+                    }
+                };
+                tabBar.appendChild(t);
+            });
+        }
+
         async function load(h) {
             fileH = h;
+
+            // Add to tabs if not exists
+            if (!openTabs.find(x => x.name === h.name)) {
+                openTabs.push(h);
+            }
+
             const items = document.querySelectorAll('.file-item');
             items.forEach(li => {
                 li.classList.remove('active');
@@ -1086,7 +1329,12 @@
 
             if (isDir) { const f = await h.getFile(); ed.value = await f.text(); }
             else { ed.value = projectMemory[h.name] || ""; }
-            tab.textContent = h.name; msg.textContent = h.name; updateLines();
+
+            msg.textContent = h.name;
+            renderTabs();
+            updateLines();
+            updateCursorStats();
+            updateHighlighting();
         }
 
         async function save(isSilent = false) {
@@ -1176,6 +1424,7 @@
         window.toggleMenu = toggleMenu;
         window.saveAs = saveAs;
         window.exportTxt = exportTxt;
+        window.exportZip = exportZip;
         window.closeAll = closeAll;
         window.listRender = listRender;
         window.showNewProject = showNewProject;
@@ -1187,6 +1436,7 @@
         window.openProject = openProject;
         window.createFile = createFile;
         window.switchSidebar = switchSidebar;
+        window.updateCursorStats = updateCursorStats;
 
         updateLines();
         checkAuth(); // Kick off flow, either shows logic or loads projects
