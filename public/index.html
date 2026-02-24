@@ -850,8 +850,6 @@
                 const sessionId = urlParams.get('session');
                 if (sessionId) {
                     startCollab(sessionId);
-                    // Remove param from URL clean
-                    window.history.replaceState({}, document.title, "/");
                 }
 
                 // On page reload (not fresh login), fetch last_project_id from server
@@ -1022,15 +1020,15 @@
             updateHighlighting();
 
             // Send cursor move to socket
-            if (socket && activeRoom && fileH) {
-                socket.emit('cursor-move', { roomId: activeRoom, file: fileH.name, pos: ed.selectionStart });
+            if (socket && activeRoom) {
+                socket.emit('cursor-move', { roomId: activeRoom, file: fileH ? fileH.name : 'shared', pos: ed.selectionStart });
             }
         });
 
         ed.addEventListener('click', () => {
             updateCursorStats();
-            if (socket && activeRoom && fileH) {
-                socket.emit('cursor-move', { roomId: activeRoom, file: fileH.name, pos: ed.selectionStart });
+            if (socket && activeRoom) {
+                socket.emit('cursor-move', { roomId: activeRoom, file: fileH ? fileH.name : 'shared', pos: ed.selectionStart });
             }
         });
 
@@ -1101,36 +1099,39 @@
             });
 
             socket.on('code-update', (data) => {
-                // Only apply if the remote file is the one we are currently viewing
+                // Accept incoming text continuously in collab mode, even if fileH doesn't match perfectly,
+                // so the joiner immediately sees the Host's code
+                isReceivingCode = true;
+                const start = ed.selectionStart;
+                const end = ed.selectionEnd;
+
+                ed.value = data.content;
                 if (fileH && fileH.name === data.file) {
-                    isReceivingCode = true;
-                    // Preserve cursor position roughly
-                    const start = ed.selectionStart;
-                    const end = ed.selectionEnd;
-
-                    ed.value = data.content;
-                    projectMemory[data.file] = data.content; // update local memory
-
-                    ed.setSelectionRange(start, end);
-                    updateLines();
-                    updateHighlighting();
-                    isReceivingCode = false;
-                } else {
-                    // Just update memory in background
                     projectMemory[data.file] = data.content;
                 }
+
+                ed.setSelectionRange(start, end);
+                updateLines();
+                updateHighlighting();
+                isReceivingCode = false;
             });
 
             socket.on('cursor-move', (data) => {
-                // Draw remote cursor if on the same file
-                if (fileH && fileH.name === data.file) {
-                    drawRemoteCursor(data.senderId, data.username, data.pos);
-                } else {
-                    removeRemoteCursor(data.senderId);
-                }
+                drawRemoteCursor(data.senderId, data.username, data.pos);
             });
 
-            socket.on('user-joined', (data) => { notify(`${data.username} подключился`); });
+            socket.on('user-joined', (data) => {
+                notify(`${data.username} подключился`);
+
+                // If we are currently editing something, broadcast it to the new user so they sync up!
+                if (ed.value) {
+                    socket.emit('code-update', {
+                        roomId: activeRoom,
+                        file: fileH ? fileH.name : 'shared',
+                        content: ed.value
+                    });
+                }
+            });
             socket.on('user-left', (data) => {
                 notify(`${data.username} отключился`);
                 removeRemoteCursor(data.id);
@@ -1140,10 +1141,10 @@
         // We override the input event strictly for collaboration broadcast
         const originalInput = ed.oninput;
         ed.addEventListener('input', () => {
-            if (socket && activeRoom && fileH && !isReceivingCode) {
+            if (socket && activeRoom && !isReceivingCode) {
                 socket.emit('code-update', {
                     roomId: activeRoom,
-                    file: fileH.name,
+                    file: fileH ? fileH.name : 'shared',
                     content: ed.value
                 });
             }
