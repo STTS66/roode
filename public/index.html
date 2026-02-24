@@ -456,16 +456,14 @@
             padding-right: 8px;
         }
 
-        textarea#editor,
-        #highlighting {
+        textarea#editor {
             flex: 1;
             background: transparent;
             margin: 0;
             border: none;
             outline: none;
             resize: none;
-            color: transparent;
-            /* Text in textarea shouldn't be visible, only cursor/selection */
+            color: var(--text-color);
             padding: 10px;
             box-sizing: border-box;
             font-family: var(--editor-font);
@@ -482,56 +480,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            /* Fix for alignment: disable browser specific text modifications */
-            -webkit-text-size-adjust: none;
-            text-rendering: optimizeLegibility;
-        }
-
-        /* The real text color goes to the highlight div behind the textarea */
-        #highlighting {
-            z-index: 1;
-            color: var(--text-color);
-            pointer-events: none;
-            /* Let clicks pass through to textarea */
-        }
-
-        textarea#editor {
-            z-index: 2;
             caret-color: #fff;
-        }
-
-        /* Prevent native selection text from covering the syntax-highlighted text behind it */
-        textarea#editor::selection {
-            color: transparent;
-            background: rgba(86, 156, 214, 0.3);
-        }
-
-        textarea#editor::-moz-selection {
-            color: transparent;
-            background: rgba(86, 156, 214, 0.3);
-        }
-
-        /* Syntax colors */
-        .token-keyword {
-            color: #569cd6;
-            font-weight: bold;
-        }
-
-        .token-string {
-            color: #ce9178;
-        }
-
-        .token-number {
-            color: #b5cea8;
-        }
-
-        .token-comment {
-            color: #6a9955;
-            font-style: italic;
-        }
-
-        .token-operator {
-            color: #d4d4d4;
         }
 
         ::-webkit-scrollbar {
@@ -706,7 +655,6 @@
             <div class="code-wrapper">
                 <div id="gutter" class="gutter"></div>
                 <div style="position: relative; flex: 1; overflow: hidden;">
-                    <pre id="highlighting" aria-hidden="true"><code></code></pre>
                     <textarea id="editor" spellcheck="false"
                         placeholder="// Roode v2.5 (Projects & Cloud Sync - Node.js Backend)"></textarea>
                 </div>
@@ -868,7 +816,6 @@
         let mouseNodes = {}; // dict mapping socket.id -> DOM element for Figma cursor
 
         const ed = document.getElementById('editor');
-        const hl = document.getElementById('highlighting').querySelector('code');
         const gut = document.getElementById('gutter');
         const ui = document.getElementById('listUI');
         const msg = document.getElementById('msg');
@@ -1053,7 +1000,6 @@
         }
         ed.addEventListener('input', () => {
             updateLines();
-            updateHighlighting();
             updateCursorStats();
             if (!isDir && fileH) projectMemory[fileH.name] = ed.value;
 
@@ -1064,11 +1010,10 @@
                 }, 1000); // 1 second debounce
             }
         });
-        ed.addEventListener('scroll', () => { gut.scrollTop = ed.scrollTop; document.getElementById('highlighting').scrollTop = ed.scrollTop; document.getElementById('highlighting').scrollLeft = ed.scrollLeft; });
+        ed.addEventListener('scroll', () => { gut.scrollTop = ed.scrollTop; });
         ed.addEventListener('keydown', () => setTimeout(updateLines, 0));
         ed.addEventListener('keyup', () => {
             updateCursorStats();
-            updateHighlighting();
 
             // Send cursor move to socket
             if (socket && activeRoom) {
@@ -1082,31 +1027,6 @@
                 socket.emit('cursor-move', { roomId: activeRoom, file: fileH ? fileH.name : 'shared', pos: ed.selectionStart });
             }
         });
-
-        function updateHighlighting() {
-            let text = ed.value;
-            // Basic regex-based highlighting
-
-            // 1. Escape HTML first
-            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-            // 2. Comments (// and /* */)
-            text = text.replace(/(\/\/[^\n]*|\/\*[\s\S]*?\*\/)/g, '<span class="token-comment">$1</span>');
-
-            // 3. Strings (" " and ' ' and ` `)
-            text = text.replace(/(["'`])(?:(?=(\\?))\2.)*?\1/g, '<span class="token-string">$&</span>');
-
-            // 4. Keywords (var, let, const, function, return, if, else, for, while, async, await etc)
-            const keywords = /\b(var|let|const|function|return|if|else|for|while|async|await|class|try|catch|throw|new|true|false|null|undefined|import|export|from|switch|case|break|continue)\b/g;
-            // Only replace keywords that are NOT already part of a comment or string tag (tricky with regex, keeping it simple for now)
-            // A perfect parser is needed for true syntactic coloring, but this is a good approximation
-            text = text.replace(keywords, '<span class="token-keyword">$1</span>');
-
-            // 5. Numbers
-            text = text.replace(/\b(\d+(\.\d+)?)\b/g, '<span class="token-number">$1</span>');
-
-            hl.innerHTML = text;
-        }
 
         document.getElementById('fname').addEventListener('keydown', e => { if (e.key === 'Enter') createFile(); });
         document.getElementById('pname').addEventListener('keydown', e => { if (e.key === 'Enter') createProject(); });
@@ -1331,7 +1251,6 @@
 
                 ed.setSelectionRange(start, end);
                 updateLines();
-                updateHighlighting();
                 isReceivingCode = false;
             });
 
@@ -2014,7 +1933,6 @@
             renderTabs();
             updateLines();
             updateCursorStats();
-            updateHighlighting();
         }
 
         async function save(isSilent = false) {
