@@ -249,6 +249,29 @@ io.on('connection', (socket) => {
         socket.to(data.roomId).emit('code-suggestion', data);
     });
 
+    // Handle Figma-style mouse tracking
+    socket.on('mouse-move', (data) => {
+        // data = { roomId, x, y }
+        socket.to(data.roomId).emit('mouse-move', {
+            senderId: socket.id,
+            username: socket.username,
+            x: data.x,
+            y: data.y
+        });
+    });
+
+    // Handle initial state sync from Host to a specific Guest
+    socket.on('collab-state', (data) => {
+        // data = { targetId, users }
+        socket.to(data.targetId).emit('collab-state', data);
+    });
+
+    // Handle Host changing a User's role
+    socket.on('role-update', (data) => {
+        // data = { roomId, targetId, role }
+        socket.to(data.roomId).emit('role-update', data);
+    });
+
     socket.on('disconnect', () => {
         console.log(`🔌 User disconnected: ${socket.id}`);
         if (socket.roomId) {

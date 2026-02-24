@@ -638,19 +638,6 @@
                 <input type="checkbox" id="autoSaveCheck" style="margin-right: 5px; cursor: pointer;">
                 <label for="autoSaveCheck" style="font-size: 11px; cursor: pointer; color: #ccc;">Auto-save</label>
             </div>
-            <div style="display: flex; align-items: center; gap: 5px;">
-                <select id="themeSelect" onchange="changeTheme()"
-                    style="background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 3px; font-size: 11px; padding: 2px;">
-                    <option value="dark">Тёмная</option>
-                    <option value="light">Светлая</option>
-                    <option value="hc">Контраст</option>
-                </select>
-            </div>
-            <div class="font-controls">
-                <button onclick="changeFontSize(-1)">A-</button>
-                <span id="fontSizeLabel">14</span>
-                <button onclick="changeFontSize(1)">A+</button>
-            </div>
             <button class="btn btn-blue" id="btnCollab" onclick="toggleCollab()"
                 style="font-weight: bold; margin-left: 5px;">🌐 Совместно</button>
             <button class="btn btn-green" id="btnSuggest" onclick="suggestChanges()"
@@ -658,6 +645,7 @@
             <button class="btn btn-gray" onclick="save()" id="btnSaveMain">💾 Save</button>
             <button class="btn btn-gray" style="font-size: 14px; font-weight: bold; padding: 2px 10px;"
                 onclick="toggleMenu(event)">•••</button>
+            <button class="btn btn-gray" style="font-size: 14px; padding: 2px 8px;" onclick="openSettings()">⚙️</button>
             <div id="mainMenu" class="dropdown">
                 <div class="dropdown-item" onclick="saveAs()">Сохранить как...</div>
                 <div class="dropdown-item" onclick="exportTxt()">Скачать .txt</div>
@@ -789,6 +777,48 @@
         </div>
     </div>
 
+    <!-- Settings Overlay -->
+    <div id="settingsOverlay" class="overlay" style="display: none;">
+        <div class="modal" style="width: 400px;">
+            <h3>⚙️ Настройки</h3>
+
+            <div
+                style="margin-top: 15px; background: rgba(0,0,0,0.1); padding: 10px; border-radius: 5px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--keyword-color);">🎨 Кастомизация</h4>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <label style="font-size: 13px;">Тема оформления:</label>
+                    <select id="themeSelect" onchange="changeTheme()"
+                        style="background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 3px; font-size: 12px; padding: 4px;">
+                        <option value="dark">Тёмная</option>
+                        <option value="light">Светлая</option>
+                        <option value="hc">Контраст</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label style="font-size: 13px;">Размер шрифта:</label>
+                    <div class="font-controls" style="margin-right: 0;">
+                        <button onclick="changeFontSize(-1)">A-</button>
+                        <span id="fontSizeLabel">14</span>
+                        <button onclick="changeFontSize(1)">A+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="collabSettings"
+                style="display: none; margin-top: 15px; background: rgba(255,107,107,0.1); padding: 10px; border-radius: 5px; border: 1px solid rgba(255,107,107,0.3);">
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: #ff6b6b;">🌐 Участники сессии</h4>
+                <div id="collabUsersList" style="font-size: 13px; max-height: 150px; overflow-y: auto;">
+                    <em style="opacity:0.5;">Нет других участников</em>
+                </div>
+            </div>
+
+            <button class="btn btn-gray" onclick="closeSettings()"
+                style="margin-top: 20px; width: 100%; padding: 8px;">Закрыть</button>
+        </div>
+    </div>
+
     <script type="module">
         import { get, set, del } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 
@@ -818,6 +848,8 @@
         let remoteCursors = {}; // store cursor visual elements
         let isReceivingCode = false; // flag to prevent infinite echo loops
         let isHost = false; // true if creator, false if joiner
+        let collabUsers = {}; // dict mapping socket.id -> { username, role: 'reader'|'editor' }
+        let mouseNodes = {}; // dict mapping socket.id -> DOM element for Figma cursor
 
         const ed = document.getElementById('editor');
         const hl = document.getElementById('highlighting').querySelector('code');
@@ -1066,6 +1098,70 @@
         function toggleMenu(e) { e.stopPropagation(); menu.classList.toggle('show'); }
         window.addEventListener('click', () => menu.classList.remove('show'));
 
+        window.openSettings = function () {
+            document.getElementById('settingsOverlay').style.display = 'flex';
+            if (activeRoom) {
+                document.getElementById('collabSettings').style.display = 'block';
+                renderCollabUsers();
+            } else {
+                document.getElementById('collabSettings').style.display = 'none';
+            }
+        }
+
+        window.closeSettings = function () {
+            document.getElementById('settingsOverlay').style.display = 'none';
+        }
+
+        window.renderCollabUsers = function () {
+            const listEl = document.getElementById('collabUsersList');
+            const keys = Object.keys(collabUsers);
+            if (keys.length === 0) {
+                listEl.innerHTML = '<em style="opacity:0.5;">Нет других участников</em>';
+                return;
+            }
+
+            let html = '';
+            keys.forEach(id => {
+                const u = collabUsers[id];
+                const color = getCursorColor(id);
+                // Host sees a select to change roles, Guest just sees text
+                let roleCtrl = '';
+                if (isHost) {
+                    roleCtrl = `<select onchange="updateUserRole('${id}', this.value)" style="background:#222; color:#ccc; border:1px solid #444; font-size:11px; padding:2px; border-radius:3px;">
+                        <option value="editor" ${u.role === 'editor' ? 'selected' : ''}>Редактор</option>
+                        <option value="reader" ${u.role === 'reader' ? 'selected' : ''}>Читатель</option>
+                    </select>`;
+                } else {
+                    roleCtrl = `<span style="font-size:11px; opacity:0.7;">${u.role === 'editor' ? 'Редактор' : 'Читатель'}</span>`;
+                }
+
+                html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; padding:4px; background:rgba(0,0,0,0.1); border-radius:3px;">
+                    <div style="display:flex; align-items:center;">
+                        <div style="width:10px; height:10px; border-radius:50%; background:${color}; margin-right:8px;"></div>
+                        <span>${u.username}</span>
+                    </div>
+                    ${roleCtrl}
+                </div>`;
+            });
+            listEl.innerHTML = html;
+        }
+
+        window.updateUserRole = function (targetId, newRole) {
+            if (!isHost || !socket || !activeRoom) return;
+            // Update locally
+            if (collabUsers[targetId]) {
+                collabUsers[targetId].role = newRole;
+            }
+            // Broadcast to the room
+            socket.emit('role-update', {
+                roomId: activeRoom,
+                targetId: targetId,
+                role: newRole
+            });
+            renderCollabUsers();
+        }
+
         // --- COLLABORATION LOGIC ---
 
         window.toggleCollab = function () {
@@ -1230,8 +1326,20 @@
             socket.on('user-joined', (data) => {
                 notify(`${data.username} подключился`);
 
+                // If we are Host, register them as editor and sync state
+                if (isHost) {
+                    collabUsers[data.id] = { username: data.username, role: 'editor' };
+                    renderCollabUsers();
+
+                    // Tell the new user who is here, including themselves, so they know their role
+                    socket.emit('collab-state', {
+                        targetId: data.id,
+                        users: collabUsers
+                    });
+                }
+
                 // If we are currently editing something, broadcast it to the new user so they sync up!
-                if (ed.value) {
+                if (isHost && ed.value) {
                     socket.emit('code-update', {
                         roomId: activeRoom,
                         file: fileH ? fileH.name : 'shared',
@@ -1239,14 +1347,57 @@
                     });
                 }
             });
+
             socket.on('user-left', (data) => {
                 notify(`${data.username} отключился`);
                 removeRemoteCursor(data.id);
+                removeMouseNode(data.id);
+                if (collabUsers[data.id]) {
+                    delete collabUsers[data.id];
+                    renderCollabUsers();
+                }
+            });
+
+            socket.on('collab-state', (data) => {
+                // Sent from Host to Guest upon joining
+                collabUsers = data.users;
+                renderCollabUsers();
+            });
+
+            socket.on('role-update', (data) => {
+                if (collabUsers[data.targetId]) {
+                    collabUsers[data.targetId].role = data.role;
+                    if (data.targetId === socket.id) {
+                        notify(`Ваша роль изменена на: ${data.role === 'editor' ? 'Редактор' : 'Читатель'}`);
+                        const btnSuggest = document.getElementById('btnSuggest');
+                        if (data.role === 'reader') {
+                            btnSuggest.style.opacity = '0.5';
+                            btnSuggest.title = 'Только для чтения';
+                        } else {
+                            btnSuggest.style.opacity = '1';
+                            btnSuggest.title = '';
+                        }
+                    }
+                    renderCollabUsers();
+                }
+            });
+
+            socket.on('mouse-move', (data) => {
+                drawMouseNode(data.senderId, data.username, data.x, data.y);
             });
         }
 
         window.suggestChanges = function () {
             if (socket && activeRoom && !isHost) {
+                // Check if reader
+                const myState = collabUsers[socket.id];
+                const myRole = myState ? myState.role : 'editor'; // default to editor if unknown
+
+                if (myRole === 'reader') {
+                    notify("Отказано: у вас права Только Читатель");
+                    return;
+                }
+
                 socket.emit('code-suggestion', {
                     roomId: activeRoom,
                     file: fileH ? fileH.name : 'shared',
@@ -1270,6 +1421,19 @@
                     });
                 }
                 // Guests edit locally until they click 'Предложить'
+            }
+        });
+
+        // Throttle mousemove for tracking
+        let lastMouseTime = 0;
+        window.addEventListener('mousemove', (e) => {
+            if (socket && activeRoom && Date.now() - lastMouseTime > 50) {
+                lastMouseTime = Date.now();
+                socket.emit('mouse-move', {
+                    roomId: activeRoom,
+                    x: e.pageX,
+                    y: e.pageY
+                });
             }
         });
 
@@ -1335,6 +1499,49 @@
             if (remoteCursors[id]) {
                 remoteCursors[id].remove();
                 delete remoteCursors[id];
+            }
+        }
+
+        function drawMouseNode(id, username, x, y) {
+            let cursorEl = mouseNodes[id];
+            if (!cursorEl) {
+                cursorEl = document.createElement('div');
+                cursorEl.style.position = 'absolute';
+                cursorEl.style.pointerEvents = 'none'; // Don't block clicks!
+                cursorEl.style.zIndex = '99999'; // Stay on top
+
+                // SVG Arrow pointing visually like a cursor
+                const svg = document.createElement('div');
+                svg.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5.808 14.853L8.358 9.531L13.9 11.239L1 1Z" fill="' + getCursorColor(id) + '" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+
+                const label = document.createElement('div');
+                label.textContent = username;
+                label.style.position = 'absolute';
+                label.style.left = '12px';
+                label.style.top = '12px';
+                label.style.backgroundColor = getCursorColor(id);
+                label.style.color = '#fff';
+                label.style.fontFamily = 'sans-serif';
+                label.style.fontSize = '12px';
+                label.style.fontWeight = 'bold';
+                label.style.padding = '2px 8px';
+                label.style.borderRadius = '12px';
+                label.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                label.style.whiteSpace = 'nowrap';
+
+                cursorEl.appendChild(svg);
+                cursorEl.appendChild(label);
+                document.body.appendChild(cursorEl); // Append to body for global tracking
+                mouseNodes[id] = cursorEl;
+            }
+            cursorEl.style.left = x + 'px';
+            cursorEl.style.top = y + 'px';
+        }
+
+        function removeMouseNode(id) {
+            if (mouseNodes[id]) {
+                mouseNodes[id].remove();
+                delete mouseNodes[id];
             }
         }
 
