@@ -1304,17 +1304,16 @@
                 label.textContent = username;
                 label.style.position = 'absolute';
                 label.style.top = `-${currentFontSize + 6}px`;
-                label.style.left = '2px';
+                label.style.left = '0'; // align flush with the left border
                 label.style.backgroundColor = cursorEl.style.backgroundColor;
                 label.style.color = '#fff';
-                label.style.fontSize = '11px';
+                label.style.fontFamily = 'sans-serif'; // Clean font
+                label.style.fontSize = '12px';
                 label.style.fontWeight = 'bold';
-                label.style.padding = '3px 6px';
-                label.style.borderRadius = '4px';
-                // This makes the bottom-left corner sharp where it meets the caret line!
-                label.style.borderBottomLeftRadius = '0';
+                label.style.padding = '2px 6px';
+                label.style.borderRadius = '4px 4px 4px 0'; // Top-L, Top-R, Bottom-R, Bottom-L
                 label.style.whiteSpace = 'nowrap';
-                label.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+                label.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
 
                 cursorEl.appendChild(label);
                 // Append to code-wrapper (assuming it's relative container for the textareas)

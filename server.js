@@ -243,6 +243,12 @@ io.on('connection', (socket) => {
         });
     });
 
+    // Handle code suggestions from guests
+    socket.on('code-suggestion', (data) => {
+        // data = { roomId, file, content, guestName }
+        socket.to(data.roomId).emit('code-suggestion', data);
+    });
+
     socket.on('disconnect', () => {
         console.log(`🔌 User disconnected: ${socket.id}`);
         if (socket.roomId) {
