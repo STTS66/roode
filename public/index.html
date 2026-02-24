@@ -500,6 +500,17 @@
             caret-color: #fff;
         }
 
+        /* Prevent native selection text from covering the syntax-highlighted text behind it */
+        textarea#editor::selection {
+            color: transparent;
+            background: rgba(86, 156, 214, 0.3);
+        }
+
+        textarea#editor::-moz-selection {
+            color: transparent;
+            background: rgba(86, 156, 214, 0.3);
+        }
+
         /* Syntax colors */
         .token-keyword {
             color: #569cd6;
