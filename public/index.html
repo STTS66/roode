@@ -1198,7 +1198,7 @@
 
                 if (!isHost) {
                     document.getElementById('btnSaveMain').style.display = 'none';
-                    document.getElementById('btnSuggest').style.display = 'inline-block';
+                    // btnSuggest is hidden because Editors edit live now
                     notify("Подключено как Гость");
                     // Request the project files if joining
                     socket.emit('request-project', activeRoom);
@@ -1361,6 +1361,15 @@
             socket.on('collab-state', (data) => {
                 // Sent from Host to Guest upon joining
                 collabUsers = data.users;
+
+                // Set initial readonly state based on assigned role
+                const myState = collabUsers[socket.id];
+                if (myState && myState.role === 'reader') {
+                    ed.readOnly = true;
+                } else {
+                    ed.readOnly = false;
+                }
+
                 renderCollabUsers();
             });
 
@@ -1371,11 +1380,11 @@
                         notify(`Ваша роль изменена на: ${data.role === 'editor' ? 'Редактор' : 'Читатель'}`);
                         const btnSuggest = document.getElementById('btnSuggest');
                         if (data.role === 'reader') {
-                            btnSuggest.style.opacity = '0.5';
-                            btnSuggest.title = 'Только для чтения';
+                            ed.readOnly = true;
+                            btnSuggest.style.display = 'none';
                         } else {
-                            btnSuggest.style.opacity = '1';
-                            btnSuggest.title = '';
+                            ed.readOnly = false;
+                            btnSuggest.style.display = 'none'; // Editors edit live now
                         }
                     }
                     renderCollabUsers();
@@ -1412,15 +1421,17 @@
         const originalInput = ed.oninput;
         ed.addEventListener('input', () => {
             if (socket && activeRoom && !isReceivingCode) {
-                if (isHost) {
-                    // Only Host broadcasts keystrokes directly
+                const myState = collabUsers[socket.id];
+                const myRole = isHost ? 'editor' : (myState ? myState.role : 'editor'); // default to editor if not set
+
+                if (isHost || myRole === 'editor') {
+                    // Both Host and Editor Guests broadcast keystrokes directly!
                     socket.emit('code-update', {
                         roomId: activeRoom,
                         file: fileH ? fileH.name : 'shared',
                         content: ed.value
                     });
                 }
-                // Guests edit locally until they click 'Предложить'
             }
         });
 
