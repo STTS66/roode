@@ -653,6 +653,8 @@
             </div>
             <button class="btn btn-blue" id="btnCollab" onclick="toggleCollab()"
                 style="font-weight: bold; margin-left: 5px;">🌐 Совместно</button>
+            <button class="btn btn-green" id="btnSuggest" onclick="suggestChanges()"
+                style="display:none; font-weight: bold; margin-left: 5px;">🌟 Предложить</button>
             <button class="btn btn-gray" onclick="save()" id="btnSaveMain">💾 Save</button>
             <button class="btn btn-gray" style="font-size: 14px; font-weight: bold; padding: 2px 10px;"
                 onclick="toggleMenu(event)">•••</button>
@@ -815,6 +817,7 @@
         let activeRoom = null;
         let remoteCursors = {}; // store cursor visual elements
         let isReceivingCode = false; // flag to prevent infinite echo loops
+        let isHost = false; // true if creator, false if joiner
 
         const ed = document.getElementById('editor');
         const hl = document.getElementById('highlighting').querySelector('code');
@@ -849,7 +852,7 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const sessionId = urlParams.get('session');
                 if (sessionId) {
-                    startCollab(sessionId);
+                    startCollab(sessionId, false);
                 }
 
                 // On page reload (not fresh login), fetch last_project_id from server
@@ -1073,7 +1076,7 @@
             } else {
                 // Generate a random room ID and start
                 const newRoom = 'room-' + Math.random().toString(36).substring(2, 8);
-                startCollab(newRoom);
+                startCollab(newRoom, true);
 
                 // Update URL so it can be copied
                 const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?session=' + newRoom;
@@ -1087,18 +1090,25 @@
             }
         }
 
-        function startCollab(roomId) {
+        function startCollab(roomId, hostFlag) {
             activeRoom = roomId;
+            isHost = hostFlag;
             socket = io(); // Connect to server
 
             socket.on('connect', () => {
                 socket.emit('join-room', activeRoom, username || 'Guest');
                 document.getElementById('btnCollab').textContent = "🔴 Online (Выйти)";
                 document.getElementById('btnCollab').style.backgroundColor = "#ff6b6b";
-                notify("Подключено к совместной сессии");
 
-                // Request the project files if joining
-                socket.emit('request-project', activeRoom);
+                if (!isHost) {
+                    document.getElementById('btnSaveMain').style.display = 'none';
+                    document.getElementById('btnSuggest').style.display = 'inline-block';
+                    notify("Подключено как Гость");
+                    // Request the project files if joining
+                    socket.emit('request-project', activeRoom);
+                } else {
+                    notify("Сессия создана (Владелец)");
+                }
             });
 
             socket.on('request-project', (requesterId) => {
@@ -1166,6 +1176,35 @@
                 }
             });
 
+            socket.on('code-suggestion', (data) => {
+                if (isHost) {
+                    if (confirm(`Гость ${data.guestName} предлагает изменения в файле ${data.file}.\n\nПринять изменения?`)) {
+                        // Accept
+                        if (fileH && fileH.name === data.file) {
+                            ed.value = data.content;
+                        }
+                        projectMemory[data.file] = data.content;
+
+                        // Broadcast the accepted update to everyone
+                        socket.emit('code-update', {
+                            roomId: activeRoom,
+                            file: data.file,
+                            content: data.content
+                        });
+
+                        if (fileH && fileH.name === data.file) {
+                            updateLines();
+                            updateHighlighting();
+                        }
+                        notify(`Изменения от ${data.guestName} приняты!`);
+                    } else {
+                        // Deny
+                        notify(`Изменения от ${data.guestName} отклонены.`);
+                        // Tell guest? (Not mandatory yet)
+                    }
+                }
+            });
+
             socket.on('code-update', (data) => {
                 // Accept incoming text continuously in collab mode, even if fileH doesn't match perfectly,
                 // so the joiner immediately sees the Host's code
@@ -1206,15 +1245,31 @@
             });
         }
 
+        window.suggestChanges = function () {
+            if (socket && activeRoom && !isHost) {
+                socket.emit('code-suggestion', {
+                    roomId: activeRoom,
+                    file: fileH ? fileH.name : 'shared',
+                    content: ed.value,
+                    guestName: username || 'Guest'
+                });
+                notify("Предложение отправлено владельцу");
+            }
+        }
+
         // We override the input event strictly for collaboration broadcast
         const originalInput = ed.oninput;
         ed.addEventListener('input', () => {
             if (socket && activeRoom && !isReceivingCode) {
-                socket.emit('code-update', {
-                    roomId: activeRoom,
-                    file: fileH ? fileH.name : 'shared',
-                    content: ed.value
-                });
+                if (isHost) {
+                    // Only Host broadcasts keystrokes directly
+                    socket.emit('code-update', {
+                        roomId: activeRoom,
+                        file: fileH ? fileH.name : 'shared',
+                        content: ed.value
+                    });
+                }
+                // Guests edit locally until they click 'Предложить'
             }
         });
 
@@ -1239,22 +1294,27 @@
                 cursorEl = document.createElement('div');
                 cursorEl.style.position = 'absolute';
                 cursorEl.style.width = '2px';
-                cursorEl.style.height = `${currentFontSize}px`;
+                cursorEl.style.height = `${currentFontSize + 4}px`;
                 cursorEl.style.backgroundColor = getCursorColor(id);
                 cursorEl.style.pointerEvents = 'none';
                 cursorEl.style.zIndex = '10';
+                cursorEl.style.transform = 'translateY(2px)';
 
                 const label = document.createElement('div');
                 label.textContent = username;
                 label.style.position = 'absolute';
-                label.style.top = `-${currentFontSize}px`;
-                label.style.left = '0';
+                label.style.top = `-${currentFontSize + 6}px`;
+                label.style.left = '2px';
                 label.style.backgroundColor = cursorEl.style.backgroundColor;
                 label.style.color = '#fff';
-                label.style.fontSize = '10px';
-                label.style.padding = '2px 4px';
-                label.style.borderRadius = '3px';
+                label.style.fontSize = '11px';
+                label.style.fontWeight = 'bold';
+                label.style.padding = '3px 6px';
+                label.style.borderRadius = '4px';
+                // This makes the bottom-left corner sharp where it meets the caret line!
+                label.style.borderBottomLeftRadius = '0';
                 label.style.whiteSpace = 'nowrap';
+                label.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
 
                 cursorEl.appendChild(label);
                 // Append to code-wrapper (assuming it's relative container for the textareas)
