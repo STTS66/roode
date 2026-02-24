@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const bcrypt = require('bcryptjs');
@@ -6,6 +8,9 @@ const jwt = require('jsonwebtoken');
 const { pool, initDB } = require('./db');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: '*' } });
+
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-roode-key';
 
@@ -204,9 +209,51 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// --- SOCKET.IO REAL-TIME COLLABORATION ---
+io.on('connection', (socket) => {
+    console.log(`🔌 User connected: ${socket.id}`);
+
+    // Join a specific project room
+    socket.on('join-room', (roomId, username) => {
+        socket.join(roomId);
+        socket.username = username || 'Guest';
+        socket.roomId = roomId;
+        console.log(`👤 ${socket.username} (${socket.id}) joined room: ${roomId}`);
+        socket.to(roomId).emit('user-joined', { id: socket.id, username: socket.username });
+    });
+
+    // Handle code changes
+    socket.on('code-update', (data) => {
+        // data = { roomId, file, content }
+        socket.to(data.roomId).emit('code-update', {
+            file: data.file,
+            content: data.content,
+            senderId: socket.id
+        });
+    });
+
+    // Handle cursor movements
+    socket.on('cursor-move', (data) => {
+        // data = { roomId, file, pos }
+        socket.to(data.roomId).emit('cursor-move', {
+            file: data.file,
+            pos: data.pos,
+            username: socket.username,
+            senderId: socket.id
+        });
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`🔌 User disconnected: ${socket.id}`);
+        if (socket.roomId) {
+            socket.to(socket.roomId).emit('user-left', { id: socket.id, username: socket.username });
+        }
+    });
+});
+
 // Initialize DB and start server
 initDB().then(() => {
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
         console.log(`🚀 Server running on http://localhost:${PORT}`);
     });
 }).catch(err => {

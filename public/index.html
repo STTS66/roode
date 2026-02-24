@@ -7,6 +7,8 @@
     <title>Roode v2.5 (Projects & Sync)</title>
     <!-- JSZip for exporting projects -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Socket.IO for Real-Time Collaboration -->
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
             /* Default Dark Theme (VS Code Dark+ inspired) */
@@ -649,6 +651,8 @@
                 <span id="fontSizeLabel">14</span>
                 <button onclick="changeFontSize(1)">A+</button>
             </div>
+            <button class="btn btn-blue" id="btnCollab" onclick="toggleCollab()"
+                style="font-weight: bold; margin-left: 5px;">🌐 Совместно</button>
             <button class="btn btn-gray" onclick="save()" id="btnSaveMain">💾 Save</button>
             <button class="btn btn-gray" style="font-size: 14px; font-weight: bold; padding: 2px 10px;"
                 onclick="toggleMenu(event)">•••</button>
@@ -806,6 +810,12 @@
         // Tabs State
         let openTabs = [];
 
+        // Collaboration State
+        let socket = null;
+        let activeRoom = null;
+        let remoteCursors = {}; // store cursor visual elements
+        let isReceivingCode = false; // flag to prevent infinite echo loops
+
         const ed = document.getElementById('editor');
         const hl = document.getElementById('highlighting').querySelector('code');
         const gut = document.getElementById('gutter');
@@ -834,6 +844,15 @@
                 document.getElementById('btnLogout').style.display = 'flex';
                 document.getElementById('userGreeting').style.display = 'flex';
                 document.getElementById('userGreeting').textContent = `Привет, ${username}!`;
+
+                // Handle session logic on page load
+                const urlParams = new URLSearchParams(window.location.search);
+                const sessionId = urlParams.get('session');
+                if (sessionId) {
+                    startCollab(sessionId);
+                    // Remove param from URL clean
+                    window.history.replaceState({}, document.title, "/");
+                }
 
                 // On page reload (not fresh login), fetch last_project_id from server
                 if (!serverLastProjectId) {
@@ -998,8 +1017,22 @@
         });
         ed.addEventListener('scroll', () => { gut.scrollTop = ed.scrollTop; document.getElementById('highlighting').scrollTop = ed.scrollTop; document.getElementById('highlighting').scrollLeft = ed.scrollLeft; });
         ed.addEventListener('keydown', () => setTimeout(updateLines, 0));
-        ed.addEventListener('keyup', () => { updateCursorStats(); updateHighlighting(); });
-        ed.addEventListener('click', updateCursorStats);
+        ed.addEventListener('keyup', () => {
+            updateCursorStats();
+            updateHighlighting();
+
+            // Send cursor move to socket
+            if (socket && activeRoom && fileH) {
+                socket.emit('cursor-move', { roomId: activeRoom, file: fileH.name, pos: ed.selectionStart });
+            }
+        });
+
+        ed.addEventListener('click', () => {
+            updateCursorStats();
+            if (socket && activeRoom && fileH) {
+                socket.emit('cursor-move', { roomId: activeRoom, file: fileH.name, pos: ed.selectionStart });
+            }
+        });
 
         function updateHighlighting() {
             let text = ed.value;
@@ -1031,6 +1064,159 @@
 
         function toggleMenu(e) { e.stopPropagation(); menu.classList.toggle('show'); }
         window.addEventListener('click', () => menu.classList.remove('show'));
+
+        // --- COLLABORATION LOGIC ---
+
+        window.toggleCollab = function () {
+            if (activeRoom) {
+                if (confirm("Выйти из совместного сеанса?")) {
+                    window.location.href = window.location.pathname; // Reload without param
+                }
+            } else {
+                // Generate a random room ID and start
+                const newRoom = 'room-' + Math.random().toString(36).substring(2, 8);
+                startCollab(newRoom);
+
+                // Update URL so it can be copied
+                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?session=' + newRoom;
+                window.history.pushState({ path: newUrl }, '', newUrl);
+
+                // Copy to clipboard
+                navigator.clipboard.writeText(newUrl);
+                notify("Ссылка скопирована!");
+                document.getElementById('btnCollab').textContent = "🔴 Online (Выйти)";
+                document.getElementById('btnCollab').style.backgroundColor = "#ff6b6b";
+            }
+        }
+
+        function startCollab(roomId) {
+            activeRoom = roomId;
+            socket = io(); // Connect to server
+
+            socket.on('connect', () => {
+                socket.emit('join-room', activeRoom, username || 'Guest');
+                document.getElementById('btnCollab').textContent = "🔴 Online (Выйти)";
+                document.getElementById('btnCollab').style.backgroundColor = "#ff6b6b";
+                notify("Подключено к совместной сессии");
+            });
+
+            socket.on('code-update', (data) => {
+                // Only apply if the remote file is the one we are currently viewing
+                if (fileH && fileH.name === data.file) {
+                    isReceivingCode = true;
+                    // Preserve cursor position roughly
+                    const start = ed.selectionStart;
+                    const end = ed.selectionEnd;
+
+                    ed.value = data.content;
+                    projectMemory[data.file] = data.content; // update local memory
+
+                    ed.setSelectionRange(start, end);
+                    updateLines();
+                    updateHighlighting();
+                    isReceivingCode = false;
+                } else {
+                    // Just update memory in background
+                    projectMemory[data.file] = data.content;
+                }
+            });
+
+            socket.on('cursor-move', (data) => {
+                // Draw remote cursor if on the same file
+                if (fileH && fileH.name === data.file) {
+                    drawRemoteCursor(data.senderId, data.username, data.pos);
+                } else {
+                    removeRemoteCursor(data.senderId);
+                }
+            });
+
+            socket.on('user-joined', (data) => { notify(`${data.username} подключился`); });
+            socket.on('user-left', (data) => {
+                notify(`${data.username} отключился`);
+                removeRemoteCursor(data.id);
+            });
+        }
+
+        // We override the input event strictly for collaboration broadcast
+        const originalInput = ed.oninput;
+        ed.addEventListener('input', () => {
+            if (socket && activeRoom && fileH && !isReceivingCode) {
+                socket.emit('code-update', {
+                    roomId: activeRoom,
+                    file: fileH.name,
+                    content: ed.value
+                });
+            }
+        });
+
+        // Function to draw remote cursors
+        function drawRemoteCursor(id, username, pos) {
+            // Find coordinates of the character at `pos`
+            const textToCursor = ed.value.substring(0, pos);
+            const lines = textToCursor.split('\n');
+            const currentLine = lines.length;
+            const currentCol = lines[lines.length - 1].length;
+
+            // Calculate pixel position based on font size (approximate)
+            // Monospace font: width is roughly fontSize * 0.6
+            const fontWidth = currentFontSize * 0.6;
+            const lineHeight = currentFontSize + 6; // matching CSS
+
+            const top = (currentLine - 1) * lineHeight - ed.scrollTop + 10; // +10 for padding
+            const left = currentCol * fontWidth - ed.scrollLeft + 10;
+
+            let cursorEl = remoteCursors[id];
+            if (!cursorEl) {
+                cursorEl = document.createElement('div');
+                cursorEl.style.position = 'absolute';
+                cursorEl.style.width = '2px';
+                cursorEl.style.height = `${currentFontSize}px`;
+                cursorEl.style.backgroundColor = getCursorColor(id);
+                cursorEl.style.pointerEvents = 'none';
+                cursorEl.style.zIndex = '10';
+
+                const label = document.createElement('div');
+                label.textContent = username;
+                label.style.position = 'absolute';
+                label.style.top = `-${currentFontSize}px`;
+                label.style.left = '0';
+                label.style.backgroundColor = cursorEl.style.backgroundColor;
+                label.style.color = '#fff';
+                label.style.fontSize = '10px';
+                label.style.padding = '2px 4px';
+                label.style.borderRadius = '3px';
+                label.style.whiteSpace = 'nowrap';
+
+                cursorEl.appendChild(label);
+                // Append to code-wrapper (assuming it's relative container for the textareas)
+                document.querySelector('.code-wrapper > div:last-child').appendChild(cursorEl);
+                remoteCursors[id] = cursorEl;
+            }
+
+            // Ensure bounds
+            if (top >= 0 && left >= 0) {
+                cursorEl.style.display = 'block';
+                cursorEl.style.top = `${top}px`;
+                cursorEl.style.left = `${left}px`;
+            } else {
+                cursorEl.style.display = 'none';
+            }
+        }
+
+        function removeRemoteCursor(id) {
+            if (remoteCursors[id]) {
+                remoteCursors[id].remove();
+                delete remoteCursors[id];
+            }
+        }
+
+        // Colors for random users
+        const userColors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+        function getCursorColor(id) {
+            let hash = 0;
+            for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+            return userColors[Math.abs(hash) % userColors.length];
+        }
 
         // --- API / PROJECTS LOGIC ---
 
