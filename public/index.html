@@ -1453,7 +1453,7 @@
         });
 
         // Initialize Local Features
-        loadNotes();
+        // (Moved to the end of the script to prevent ReferenceError)
 
         // Font Size Logic
         let currentFontSize = parseInt(localStorage.getItem('roode_font_size')) || 14;
@@ -3232,6 +3232,7 @@
         window.changeTheme = changeTheme;
 
         updateLines();
+        window.loadNotes();
         checkAuth(); // Kick off flow, either shows logic or loads projects
 
     </script>
