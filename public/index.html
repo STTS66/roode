@@ -570,12 +570,10 @@
             color: #ccc;
             cursor: pointer;
             font-size: 14px;
-            padding: 2px 5px;
-            line-height: 1;
         }
 
         .font-controls button:hover {
-            color: #fff;
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .font-controls span {
@@ -583,6 +581,160 @@
             color: #888;
             min-width: 24px;
             text-align: center;
+        }
+
+        /* Command Palette */
+        #cmdPalette {
+            position: fixed;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 450px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Context Menu */
+        #fileContextMenu {
+            position: fixed;
+            z-index: 10000;
+            min-width: 120px;
+            width: max-content;
+        }
+
+        #fileContextMenu .dropdown-item {
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+
+        #cmdInput {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 15px;
+            font-size: 16px;
+            outline: none;
+            font-family: inherit;
+        }
+
+        #cmdResults {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .cmd-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .cmd-item:hover,
+        .cmd-item.selected {
+            background: var(--active-bg);
+        }
+
+        /* Find & Replace */
+        #findReplace {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            padding: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            width: 320px;
+        }
+
+        .fr-row {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .fr-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .fr-input:focus {
+            border-color: #007acc;
+        }
+
+        .fr-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid transparent;
+            color: #ccc;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .fr-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .fr-msg {
+            font-size: 11px;
+            color: #888;
+            text-align: right;
+        }
+
+        /* Autocomplete */
+        #autocomplete {
+            position: absolute;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+            max-height: 150px;
+            overflow-y: auto;
+            width: 200px;
+            display: none;
+            font-family: inherit;
+        }
+
+        .ac-item {
+            padding: 5px 10px;
+            font-size: 12px;
+            color: var(--text-color);
+            cursor: pointer;
+        }
+
+        .ac-item.selected,
+        .ac-item:hover {
+            background: var(--active-bg);
+            color: #fff;
         }
     </style>
 </head>
@@ -654,9 +806,29 @@
             </div>
             <div class="code-wrapper">
                 <div id="gutter" class="gutter"></div>
-                <div style="position: relative; flex: 1; overflow: hidden;">
+                <div style="position: relative; flex: 1; overflow: hidden;" id="editorContainer">
+
+                    <!-- Find & Replace Widget -->
+                    <div id="findReplace">
+                        <div class="fr-row">
+                            <input type="text" id="frFindInput" class="fr-input" placeholder="Найти...">
+                            <button class="fr-btn" id="frPrev" title="Предыдущее (Shift+Enter)">▲</button>
+                            <button class="fr-btn" id="frNext" title="Следующее (Enter)">▼</button>
+                            <button class="fr-btn" onclick="closeFindReplace()" style="color:#ff6b6b">✕</button>
+                        </div>
+                        <div class="fr-row">
+                            <input type="text" id="frReplaceInput" class="fr-input" placeholder="Заменить на...">
+                            <button class="fr-btn" id="frReplaceBtn" title="Заменить (Enter)">Заменить</button>
+                            <button class="fr-btn" id="frReplaceAllBtn">Все</button>
+                        </div>
+                        <div class="fr-msg" id="frMsg">Нет совпадений</div>
+                    </div>
+
                     <textarea id="editor" spellcheck="false"
                         placeholder="// Roode v2.5 (Projects & Cloud Sync - Node.js Backend)"></textarea>
+
+                    <!-- Autocomplete Popup -->
+                    <ul id="autocomplete"></ul>
                 </div>
             </div>
         </div>
@@ -781,6 +953,18 @@
             <button class="btn btn-gray" onclick="closeSettings()"
                 style="margin-top: 20px; width: 100%; padding: 8px;">Закрыть</button>
         </div>
+    </div>
+
+    <!-- Command Palette -->
+    <div id="cmdPalette">
+        <input type="text" id="cmdInput" placeholder="Поиск файлов по имени..." autocomplete="off">
+        <ul id="cmdResults"></ul>
+    </div>
+
+    <!-- File Context Menu -->
+    <div id="fileContextMenu" class="dropdown">
+        <div class="dropdown-item" onclick="renameFileCtx()">✏️ Переименовать</div>
+        <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFileCtx()">🗑 Удалить</div>
     </div>
 
     <script type="module">
@@ -1150,7 +1334,7 @@
                         let files = [];
                         if (isDir && fHandle) {
                             for await (const [n, h] of fHandle.entries()) {
-                                if (h.kind === 'file' && n.toUpperCase().match(/\.(PRSH|PRSHX|TXT)$/)) files.push(n);
+                                if (h.kind === 'file' && !n.startsWith('.')) files.push(n);
                             }
                         } else {
                             files = filesCache.map(f => f.name);
@@ -1355,6 +1539,15 @@
         // We override the input event strictly for collaboration broadcast
         const originalInput = ed.oninput;
         ed.addEventListener('input', () => {
+            if (fileH) {
+                let currentTab = openTabs.find(t => t.name === fileH.name);
+                if (currentTab && !currentTab.isDirty) {
+                    currentTab.isDirty = true;
+                    renderTabs();
+                }
+                projectMemory[fileH.name] = ed.value;
+            }
+
             if (socket && activeRoom && !isReceivingCode) {
                 const myState = collabUsers[socket.id];
                 const myRole = isHost ? 'editor' : (myState ? myState.role : 'editor'); // default to editor if not set
@@ -1831,14 +2024,99 @@
             } catch (e) { }
         }
 
-        function resetEd() { fileH = null; ed.value = ''; openTabs = []; renderTabs(); updateLines(); updateHighlighting(); }
+        function resetEd() { fileH = null; ed.value = ''; openTabs = []; renderTabs(); updateLines(); }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            if (ext === 'js') return '<span style="color:#f1e05a; font-weight:bold; font-size:14px;">JS</span>';
+            if (ext === 'html') return '<span style="color:#e34c26; font-weight:bold; font-size:14px;">&lt;/&gt;</span>';
+            if (ext === 'css') return '<span style="color:#563d7c; font-weight:bold; font-size:14px;">#</span>';
+            if (ext === 'json') return '<span style="color:#cb3837; font-weight:bold; font-size:14px;">{}</span>';
+            if (ext === 'md') return '<span style="color:#083fa1; font-weight:bold; font-size:14px;">M↓</span>';
+            if (ext === 'prsh') return '<img src="/logo/rupl.svg" style="width:20px; height:20px; vertical-align:middle; object-fit:contain; margin-left:-2px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">';
+            if (ext === 'prshx') return '<img src="/logo/ruplx.svg" style="width:20px; height:20px; vertical-align:middle; object-fit:contain; margin-left:-2px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">';
+            if (filename.match(/\.(png|jpe?g|gif|svg)$/i)) return '🖼️';
+            return '📄';
+        }
+
+        let contextMenuTarget = null;
+        window.addEventListener('click', () => {
+            const menu = document.getElementById('fileContextMenu');
+            if (menu) menu.style.display = 'none';
+        });
+
+        async function renameFileCtx() {
+            const h = contextMenuTarget;
+            if (!h) return;
+
+            let newName = prompt("Новое имя файла:", h.name);
+            if (!newName || newName === h.name) return;
+
+            if (isDir) {
+                try {
+                    const f = await h.getFile();
+                    const content = projectMemory[h.name] !== undefined ? projectMemory[h.name] : await f.text();
+
+                    const newHandle = await fHandle.getFileHandle(newName, { create: true });
+                    const w = await newHandle.createWritable();
+                    await w.write(content);
+                    await w.close();
+
+                    await fHandle.removeEntry(h.name);
+
+                    let tab = openTabs.find(t => t.name === h.name);
+                    if (tab) {
+                        tab.name = newName;
+                        tab.h = newHandle;
+                    }
+                    if (fileH && fileH.name === h.name) {
+                        fileH = newHandle;
+                    }
+
+                    if (projectMemory[h.name] !== undefined) {
+                        projectMemory[newName] = projectMemory[h.name];
+                        delete projectMemory[h.name];
+                    }
+
+                } catch (e) {
+                    alert("Ошибка переименования: " + e.message);
+                }
+            } else {
+                alert("Переименование доступно только в проектах");
+            }
+            renderTabs();
+            listRender();
+        }
+
+        async function deleteFileCtx() {
+            const h = contextMenuTarget;
+            if (!h) return;
+            if (!confirm(`Удалить файл ${h.name}?`)) return;
+
+            if (isDir) {
+                await fHandle.removeEntry(h.name);
+            } else {
+                filesCache = filesCache.filter(x => x.name !== h.name);
+                delete projectMemory[h.name];
+            }
+
+            openTabs = openTabs.filter(x => x.name !== h.name);
+
+            if (fileH && fileH.name === h.name) {
+                if (openTabs.length > 0) load(openTabs[openTabs.length - 1].h);
+                else resetEd();
+            } else {
+                renderTabs();
+            }
+            listRender();
+        }
 
         async function listRender() {
             ui.innerHTML = '';
             let list = [];
             if (isDir && fHandle) {
                 for await (const [n, h] of fHandle.entries()) {
-                    if (h.kind === 'file' && n.toUpperCase().match(/\.(PRSH|PRSHX|TXT)$/)) list.push(h);
+                    if (h.kind === 'file' && !n.startsWith('.')) list.push(h); // Show all files except hidden
                 }
             } else if (!isDir) list = [...filesCache];
 
@@ -1849,15 +2127,16 @@
 
                 if (fileH && fileH.name === h.name) li.classList.add('active');
 
-                const ico = h.name.match(/X$/i) ? '🧩' : '📄';
-                li.innerHTML = `<span>${ico} ${h.name}</span><span class="del-btn">🗑</span>`;
-                li.onclick = (e) => { if (!e.target.className.includes('del')) load(h); };
-                li.querySelector('.del-btn').onclick = async () => {
-                    if (!confirm('Удалить файл?')) return;
-                    if (isDir) await fHandle.removeEntry(h.name);
-                    else { filesCache = filesCache.filter(x => x != h); delete projectMemory[h.name]; }
-                    if (fileH && fileH.name == h.name) resetEd();
-                    listRender();
+                const ico = getFileIcon(h.name);
+                li.innerHTML = `<span style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;"><span style="width:16px; display:inline-block; text-align:center;">${ico}</span><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${h.name}</span></span>`;
+                li.onclick = () => load(h);
+                li.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    contextMenuTarget = h;
+                    const menu = document.getElementById('fileContextMenu');
+                    menu.style.display = 'flex';
+                    menu.style.left = e.pageX + 'px';
+                    menu.style.top = e.pageY + 'px';
                 };
                 ui.appendChild(li);
             });
@@ -1867,25 +2146,29 @@
             tabBar.innerHTML = '';
             if (openTabs.length === 0) return;
 
-            openTabs.forEach(h => {
-                const isActive = (fileH && fileH.name === h.name);
+            openTabs.forEach(tabObj => {
+                const isActive = (fileH && fileH.name === tabObj.name);
                 const t = document.createElement('div');
                 t.className = 'tab' + (isActive ? ' active' : '');
-                t.innerHTML = `<span>${h.name}</span><span class="tab-close">×</span>`;
+
+                const dirtyMark = tabObj.isDirty ? '<span style="color:#f1e05a;">*</span>' : '';
+                t.innerHTML = `<span style="display:flex; align-items:center; gap:3px;">${getFileIcon(tabObj.name)} ${tabObj.name}${dirtyMark}</span><span class="tab-close">×</span>`;
 
                 t.onclick = (e) => {
                     if (e.target.className === 'tab-close') {
                         e.stopPropagation();
                         // Close tab
-                        openTabs = openTabs.filter(x => x.name !== h.name);
+                        openTabs = openTabs.filter(x => x.name !== tabObj.name);
+                        delete projectMemory[tabObj.name]; // clear memory to reload from disk later
+
                         if (isActive) {
-                            if (openTabs.length > 0) load(openTabs[openTabs.length - 1]);
+                            if (openTabs.length > 0) load(openTabs[openTabs.length - 1].h);
                             else resetEd();
                         } else {
                             renderTabs();
                         }
                     } else {
-                        load(h);
+                        load(tabObj.h);
                     }
                 };
                 tabBar.appendChild(t);
@@ -1893,11 +2176,18 @@
         }
 
         async function load(h) {
+            // Backup current editor state BEFORE loading new file
+            if (fileH) {
+                projectMemory[fileH.name] = ed.value;
+            }
+
             fileH = h;
 
             // Add to tabs if not exists
-            if (!openTabs.find(x => x.name === h.name)) {
-                openTabs.push(h);
+            let tabObj = openTabs.find(x => x.name === h.name);
+            if (!tabObj) {
+                tabObj = { h: h, name: h.name, isDirty: false };
+                openTabs.push(tabObj);
             }
 
             const items = document.querySelectorAll('.file-item');
@@ -1915,17 +2205,23 @@
                 }).catch(e => console.log(e));
             }
 
-            if (isDir) {
-                const f = await h.getFile();
-                ed.value = await f.text();
+            if (projectMemory[h.name] !== undefined) {
+                ed.value = projectMemory[h.name];
             } else {
-                if (h.isRemote) {
-                    ed.value = projectMemory[h.name] !== undefined ? projectMemory[h.name] : "// Загрузка по сети...";
-                    if (projectMemory[h.name] === undefined && socket) {
-                        socket.emit('request-file', { roomId: activeRoom, file: h.name });
-                    }
+                if (isDir) {
+                    const f = await h.getFile();
+                    ed.value = await f.text();
+                    projectMemory[h.name] = ed.value;
                 } else {
-                    ed.value = projectMemory[h.name] || "";
+                    if (h.isRemote) {
+                        ed.value = "// Загрузка по сети...";
+                        if (socket) {
+                            socket.emit('request-file', { roomId: activeRoom, file: h.name });
+                        }
+                    } else {
+                        ed.value = "";
+                        projectMemory[h.name] = "";
+                    }
                 }
             }
 
@@ -1936,22 +2232,30 @@
         }
 
         async function save(isSilent = false) {
+            if (!fileH) return;
+
+            projectMemory[fileH.name] = ed.value;
+            let currentTab = openTabs.find(t => t.name === fileH.name);
+            if (currentTab) currentTab.isDirty = false;
+
             if (isDir) {
-                if (!fileH) return !isSilent && alert('Нет файла');
                 const w = await fileH.createWritable(); await w.write(ed.value); await w.close();
                 if (!isSilent) notify(`Saved: ${fileH.name}`);
             } else {
-                if (filesCache.length === 0) return !isSilent && alert("Пусто");
-                if (fileH) projectMemory[fileH.name] = ed.value;
-                try {
-                    let c = 0;
-                    for (let h of filesCache) {
-                        const ct = projectMemory[h.name];
-                        if (ct !== undefined) { const w = await h.createWritable(); await w.write(ct); await w.close(); c++; }
-                    }
-                    if (!isSilent) notify(`✅ Updated ${c} files`);
-                } catch (e) { !isSilent && alert("Err: " + e.message); }
+                if (filesCache.length !== 0) {
+                    try {
+                        let c = 0;
+                        for (let h of filesCache) {
+                            const ct = projectMemory[h.name];
+                            if (ct !== undefined) { const w = await h.createWritable(); await w.write(ct); await w.close(); c++; }
+                        }
+                        if (!isSilent) notify(`✅ Updated ${c} files`);
+                    } catch (e) { !isSilent && alert("Err: " + e.message); }
+                } else if (fileH.isRemote && !isSilent) {
+                    notify(`Saved to memory: ${fileH.name}`);
+                }
             }
+            renderTabs();
         }
 
         function notify(txt) { msg.textContent = txt; setTimeout(() => msg.textContent = 'Готов', 3000); }
@@ -2011,6 +2315,438 @@
                     }
 
                     await openProject(projectsList[nextIndex].id);
+                }
+            }
+
+            // COMMAND PALETTE: Ctrl + P
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                showCommandPalette();
+            }
+
+            // FIND & REPLACE: Ctrl + F
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                openFindReplace();
+            }
+        });
+
+        // --- FIND & REPLACE LOGIC ---
+        let frMatches = [];
+        let frCurrentIndex = -1;
+
+        const frWidget = document.getElementById('findReplace');
+        const frFindInput = document.getElementById('frFindInput');
+        const frReplaceInput = document.getElementById('frReplaceInput');
+        const frMsg = document.getElementById('frMsg');
+
+        function openFindReplace() {
+            frWidget.style.display = 'flex';
+
+            // Pre-fill with selected text if any
+            const selection = ed.value.substring(ed.selectionStart, ed.selectionEnd);
+            if (selection && !selection.includes('\n')) {
+                frFindInput.value = selection;
+            }
+
+            frFindInput.focus();
+            frFindInput.select();
+            performFind();
+        }
+
+        function closeFindReplace() {
+            frWidget.style.display = 'none';
+            ed.focus();
+        }
+
+        function performFind() {
+            const query = frFindInput.value;
+            if (!query) {
+                frMatches = [];
+                frCurrentIndex = -1;
+                frMsg.textContent = 'Пусто';
+                return;
+            }
+
+            // Simple exact case-insensitive search
+            const text = ed.value.toLowerCase();
+            const searchStr = query.toLowerCase();
+
+            frMatches = [];
+            let startIndex = 0;
+            let index;
+
+            while ((index = text.indexOf(searchStr, startIndex)) > -1) {
+                frMatches.push(index);
+                startIndex = index + searchStr.length;
+            }
+
+            if (frMatches.length === 0) {
+                frCurrentIndex = -1;
+                frMsg.textContent = 'Нет совпадений';
+            } else {
+                // Find nearest match to cursor
+                const cursorPos = ed.selectionStart;
+                frCurrentIndex = frMatches.findIndex(m => m >= cursorPos);
+                if (frCurrentIndex === -1) frCurrentIndex = 0;
+
+                highlightMatch();
+            }
+        }
+
+        function highlightMatch() {
+            if (frMatches.length === 0 || frCurrentIndex === -1) return;
+
+            const pos = frMatches[frCurrentIndex];
+            const len = frFindInput.value.length;
+
+            ed.focus();
+            ed.setSelectionRange(pos, pos + len);
+
+            frMsg.textContent = `${frCurrentIndex + 1} из ${frMatches.length}`;
+
+            // Scroll to the selection
+            const textToCursor = ed.value.substring(0, pos);
+            const currentLine = textToCursor.split('\n').length;
+            const lineHeight = currentFontSize + 6;
+            const scrollPos = (currentLine - 1) * lineHeight;
+            ed.scrollTop = scrollPos - (ed.clientHeight / 2);
+        }
+
+        function frNext() {
+            if (frMatches.length === 0) return;
+            frCurrentIndex = (frCurrentIndex + 1) % frMatches.length;
+            highlightMatch();
+        }
+
+        function frPrev() {
+            if (frMatches.length === 0) return;
+            frCurrentIndex = (frCurrentIndex - 1 + frMatches.length) % frMatches.length;
+            highlightMatch();
+        }
+
+        function performReplace() {
+            if (frMatches.length === 0 || frCurrentIndex === -1) return;
+
+            const start = frMatches[frCurrentIndex];
+            const len = frFindInput.value.length;
+            const replaceStr = frReplaceInput.value;
+
+            // We only replace if the current selection actually matches
+            if (ed.selectionStart === start && ed.selectionEnd === start + len) {
+                const text = ed.value;
+                ed.value = text.substring(0, start) + replaceStr + text.substring(start + len);
+
+                // Adjust cursor and broadcast
+                ed.setSelectionRange(start + replaceStr.length, start + replaceStr.length);
+                ed.dispatchEvent(new Event('input')); // trigger save and broadcast
+
+                // Re-calculate matches because string length changed
+                performFind();
+            } else {
+                // Just jump to it if it wasn't selected
+                highlightMatch();
+            }
+        }
+
+        function performReplaceAll() {
+            if (!frFindInput.value) return;
+
+            // For simplicity, we use regex with global and case insensitive flags
+            // Need to escape regex characters in the find string
+            const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escapeRegExp(frFindInput.value), 'gi');
+
+            const text = ed.value;
+            const newText = text.replace(regex, frReplaceInput.value);
+
+            if (text !== newText) {
+                ed.value = newText;
+                ed.dispatchEvent(new Event('input'));
+                performFind(); // Recalculate (should be 0)
+                notify("Все совпадения заменены!");
+            }
+        }
+
+        frFindInput.addEventListener('input', performFind);
+        frFindInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (e.shiftKey) frPrev(); else frNext();
+            } else if (e.key === 'Escape') {
+                closeFindReplace();
+            }
+        });
+
+        frReplaceInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performReplace();
+            } else if (e.key === 'Escape') {
+                closeFindReplace();
+            }
+        });
+
+        document.getElementById('frNext').addEventListener('click', frNext);
+        document.getElementById('frPrev').addEventListener('click', frPrev);
+        document.getElementById('frReplaceBtn').addEventListener('click', performReplace);
+        document.getElementById('frReplaceAllBtn').addEventListener('click', performReplaceAll);
+
+        // --- COMMAND PALETTE LOGIC ---
+        let cmdItems = [];
+        let cmdSelectedIndex = 0;
+
+        function closeCommandPalette() {
+            document.getElementById('cmdPalette').style.display = 'none';
+            ed.focus();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('cmdPalette').style.display === 'flex') {
+                closeCommandPalette();
+            }
+        });
+
+        document.getElementById('cmdInput').addEventListener('keydown', (e) => {
+            const list = document.querySelectorAll('#cmdResults .cmd-item');
+            if (list.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                cmdSelectedIndex = (cmdSelectedIndex + 1) % list.length;
+                renderCmdResults();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                cmdSelectedIndex = (cmdSelectedIndex - 1 + list.length) % list.length;
+                renderCmdResults();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (cmdItems[cmdSelectedIndex]) {
+                    cmdItems[cmdSelectedIndex].action();
+                    closeCommandPalette();
+                }
+            }
+        });
+
+        document.getElementById('cmdInput').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            if (!query) {
+                cmdItems = buildCmdList();
+            } else {
+                cmdItems = buildCmdList().filter(item => item.name.toLowerCase().includes(query));
+            }
+            cmdSelectedIndex = 0;
+            renderCmdResults();
+        });
+
+        function buildCmdList() {
+            let items = [];
+
+            // Gather files
+            let allFiles = [];
+            if (isDir && fHandle) {
+                // Async collection of handles is slow, so we rely on the cached list from UI or memory for speed
+                document.querySelectorAll('#listUI .file-item').forEach(li => {
+                    allFiles.push(li.dataset.name);
+                });
+            } else {
+                allFiles = filesCache.map(f => f.name);
+            }
+
+            allFiles.forEach(fileName => {
+                items.push({
+                    name: `Файл: ${fileName}`,
+                    icon: getFileIcon(fileName),
+                    action: () => {
+                        const fileLi = Array.from(document.querySelectorAll('#listUI .file-item')).find(li => li.dataset.name === fileName);
+                        if (fileLi) fileLi.click();
+                    }
+                });
+            });
+
+            // Global Commands
+            items.push({ name: '> Сменить тему', icon: '🎨', action: () => openSettings() });
+            items.push({ name: '> Открыть настройки', icon: '⚙️', action: () => openSettings() });
+            if (activeRoom) {
+                items.push({ name: '> Покинуть сессию', icon: '🏃', action: () => toggleCollab() });
+            }
+
+            return items;
+        }
+
+        function renderCmdResults() {
+            const ul = document.getElementById('cmdResults');
+            ul.innerHTML = '';
+            cmdItems.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'cmd-item' + (index === cmdSelectedIndex ? ' selected' : '');
+                li.innerHTML = `<span style="width:20px; text-align:center;">${item.icon}</span> <span>${item.name}</span>`;
+                li.onclick = () => { item.action(); closeCommandPalette(); };
+                li.onmouseover = () => { cmdSelectedIndex = index; renderCmdResults(); };
+                ul.appendChild(li);
+            });
+            // Auto-scroll logic could be added here
+        }
+
+        async function showCommandPalette() {
+            document.getElementById('cmdPalette').style.display = 'flex';
+            document.getElementById('cmdInput').value = '';
+            cmdItems = buildCmdList();
+            cmdSelectedIndex = 0;
+            renderCmdResults();
+            document.getElementById('cmdInput').focus();
+        }
+
+        // --- AUTOCOMPLETE LOGIC ---
+        const autocompleteWords = [
+            'function', 'const', 'let', 'var', 'return', 'async', 'await', 'import', 'export', 'from',
+            'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'continue', 'try', 'catch', 'throw', 'new', 'class',
+            'true', 'false', 'null', 'undefined', 'document', 'window', 'console.log', 'querySelector', 'getElementById',
+            'addEventListener', 'setTimeout', 'setInterval', 'fetch', 'then', 'catch', 'finally',
+            'div', 'span', 'p', 'a', 'img', 'ul', 'li', 'h1', 'h2', 'h3', 'header', 'nav', 'main', 'footer', 'script', 'style', 'link', 'meta'
+        ];
+
+        let acMatches = [];
+        let acSelectedIndex = 0;
+        let acCurrentWord = '';
+        let acStartPos = 0;
+        const acPopup = document.getElementById('autocomplete');
+
+        function positionAutocomplete() {
+            // Very roughly position autocomplete near cursor
+            const textToCursor = ed.value.substring(0, ed.selectionStart);
+            const lines = textToCursor.split('\n');
+            const currentLine = lines.length;
+            const currentCol = lines[lines.length - 1].length;
+
+            const fontWidth = currentFontSize * 0.6;
+            const lineHeight = currentFontSize + 6;
+
+            const topOffset = (currentLine * lineHeight) - ed.scrollTop + 10;
+            const leftOffset = (currentCol * fontWidth) - ed.scrollLeft + 40; // +40 for gutter + padding
+
+            acPopup.style.top = topOffset + 'px';
+            acPopup.style.left = leftOffset + 'px';
+        }
+
+        function renderAutocomplete() {
+            acPopup.innerHTML = '';
+            if (acMatches.length === 0) {
+                acPopup.style.display = 'none';
+                return;
+            }
+
+            acPopup.style.display = 'block';
+            positionAutocomplete();
+
+            acMatches.forEach((word, index) => {
+                const li = document.createElement('li');
+                li.className = 'ac-item' + (index === acSelectedIndex ? ' selected' : '');
+
+                // Highlight the typed part
+                const matchIndex = word.toLowerCase().indexOf(acCurrentWord.toLowerCase());
+                if (matchIndex === 0) {
+                    const typed = word.substring(0, acCurrentWord.length);
+                    const rest = word.substring(acCurrentWord.length);
+                    li.innerHTML = `<span style="color:#569cd6">${typed}</span>${rest}`;
+                } else {
+                    li.textContent = word; // Just in case it matched in middle (though our logic does startsWith usually)
+                }
+
+                li.onmousedown = (e) => {
+                    e.preventDefault(); // prevent losing focus
+                    insertAutocomplete(word);
+                };
+                li.onmouseover = () => { acSelectedIndex = index; renderAutocomplete(); };
+                acPopup.appendChild(li);
+            });
+        }
+
+        function handleAutocompleteInput() {
+            if (frWidget.style.display === 'flex') return; // Don't autocomplete while searching
+
+            const cursorPos = ed.selectionStart;
+            const textToCursor = ed.value.substring(0, cursorPos);
+
+            // Find current word
+            const match = textToCursor.match(/([a-zA-Z0-9_]+)$/);
+            if (!match) {
+                acMatches = [];
+                renderAutocomplete();
+                return;
+            }
+
+            acCurrentWord = match[1];
+            acStartPos = cursorPos - acCurrentWord.length;
+
+            if (acCurrentWord.length < 2) {
+                acMatches = [];
+                renderAutocomplete();
+                return;
+            }
+
+            const query = acCurrentWord.toLowerCase();
+            acMatches = autocompleteWords.filter(w => w.toLowerCase().startsWith(query)).slice(0, 8);
+            acSelectedIndex = 0;
+            renderAutocomplete();
+        }
+
+        function insertAutocomplete(word) {
+            const before = ed.value.substring(0, acStartPos);
+            const after = ed.value.substring(ed.selectionEnd);
+
+            ed.value = before + word + after;
+
+            const newPos = acStartPos + word.length;
+            ed.setSelectionRange(newPos, newPos);
+            ed.dispatchEvent(new Event('input')); // trigger save & broadcast
+
+            acMatches = [];
+            renderAutocomplete();
+            ed.focus();
+        }
+
+        ed.addEventListener('input', handleAutocompleteInput);
+
+        // Hide autocomplete when clicking elsewhere
+        ed.addEventListener('blur', () => {
+            setTimeout(() => {
+                acMatches = [];
+                renderAutocomplete();
+            }, 100);
+        });
+
+        ed.addEventListener('keydown', (e) => {
+            if (acMatches.length > 0 && acPopup.style.display === 'block') {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    acSelectedIndex = (acSelectedIndex + 1) % acMatches.length;
+                    renderAutocomplete();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    acSelectedIndex = (acSelectedIndex - 1 + acMatches.length) % acMatches.length;
+                    renderAutocomplete();
+                } else if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    insertAutocomplete(acMatches[acSelectedIndex]);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    acMatches = [];
+                    renderAutocomplete();
+                } else if (e.key === ' ' || e.key === '(' || e.key === '.') {
+                    // Close on space or syntax chars
+                    acMatches = [];
+                    renderAutocomplete();
+                }
+            } else {
+                // If popup is closed and user hits Tab, indent normally
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const start = ed.selectionStart;
+                    const end = ed.selectionEnd;
+                    ed.value = ed.value.substring(0, start) + "    " + ed.value.substring(end);
+                    ed.selectionStart = ed.selectionEnd = start + 4;
+                    ed.dispatchEvent(new Event('input'));
                 }
             }
         });
