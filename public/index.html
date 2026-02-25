@@ -1042,6 +1042,11 @@
                     </select>
                 </div>
 
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <label style="font-size: 13px;">Отображать мини-карту:</label>
+                    <input type="checkbox" id="minimapCheck" style="cursor: pointer;">
+                </div>
+
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <label style="font-size: 13px;">Размер шрифта:</label>
                     <div class="font-controls" style="margin-right: 0;">
@@ -1182,6 +1187,15 @@
 
         function renderMinimap() {
             const pane = panes[activePaneId];
+            const isEnabled = document.getElementById('minimapCheck').checked;
+
+            if (!isEnabled) {
+                pane.minimapContainer.style.display = 'none';
+                return;
+            } else {
+                pane.minimapContainer.style.display = 'block';
+            }
+
             const text = pane.ed.value;
             const lines = text.split('\n');
             const cW = pane.minimapContainer.clientWidth;
@@ -1223,15 +1237,24 @@
 
                 ctx.fillStyle = color;
 
-                if (scale >= 0.5) {
-                    const fontSize = Math.max(3, 4.5 * scale);
+                // For very large files, scale is tiny. Drawing text below scale 0.15 becomes an unreadable overlap.
+                if (scale >= 0.15) {
+                    // font size scales down but has a minimum visible size
+                    const fontSize = Math.max(1, 4.5 * scale);
                     ctx.font = `bold ${fontSize}px monospace`;
                     ctx.textBaseline = "top";
-                    ctx.fillText(trimmed, padLeft + indent * 1.5 * scale, y, cW - padLeft - 2);
+                    // Only fill text if it's actually large enough to be rendered as pixels
+                    if (fontSize >= 1.5) {
+                        ctx.fillText(trimmed, padLeft + indent * 1.5 * scale, y, cW - padLeft - 2);
+                    } else {
+                        const drawW = Math.min(trimmed.length * charW * scale, cW - padLeft - 4);
+                        if (drawW > 0) ctx.fillRect(padLeft + indent * charW * scale, y, drawW, Math.max(1, lineH * scale));
+                    }
                 } else {
-                    const drawW = Math.min(trimmed.length * charW, cW - padLeft - 4);
+                    // Fallback to solid blocks for huge files
+                    const drawW = Math.min(trimmed.length * charW * scale, cW - padLeft - 4);
                     if (drawW > 0) {
-                        ctx.fillRect(padLeft + indent * charW * 0.5, y, drawW, lineH * scale < 1 ? 1 : lineH * scale);
+                        ctx.fillRect(padLeft + indent * charW * scale, y, drawW, Math.max(1, lineH * scale));
                     }
                 }
             }
@@ -1450,6 +1473,18 @@
         autoSaveBox.checked = localStorage.getItem('roode_autosave') === 'true';
         autoSaveBox.addEventListener('change', (e) => {
             localStorage.setItem('roode_autosave', e.target.checked);
+        });
+
+        const minimapBox = document.getElementById('minimapCheck');
+        minimapBox.checked = localStorage.getItem('roode_show_minimap') !== 'false';
+        minimapBox.addEventListener('change', (e) => {
+            localStorage.setItem('roode_show_minimap', e.target.checked);
+            scheduleMinimapRender(); // Update 1st pane
+            // Update 2nd pane if it exists
+            const prevPane = activePaneId;
+            setActivePane(activePaneId === 1 ? 2 : 1);
+            scheduleMinimapRender();
+            setActivePane(prevPane);
         });
 
         // Initialize Local Features
