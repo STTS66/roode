@@ -1239,9 +1239,13 @@
 
                 ctx.fillStyle = color;
 
-                const drawW = Math.min(trimmed.length * charW, cW - padLeft - 4);
+                const drawW = Math.min(trimmed.length * charW, cW - padLeft - 2);
                 if (drawW > 0) {
-                    ctx.fillRect(padLeft + indent * charW * 0.5, y, drawW, lineH * scale < 1 ? 1 : lineH * scale);
+                    const rx = Math.round(padLeft + indent * charW * 0.5);
+                    const ry = Math.round(y);
+                    const rw = Math.round(drawW);
+                    const rh = Math.max(1, Math.round(lineH * scale));
+                    ctx.fillRect(rx, ry, rw, rh);
                 }
             }
             updateMinimapSlider();
