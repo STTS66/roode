@@ -386,6 +386,27 @@
             min-width: 0;
         }
 
+        .split-container {
+            display: flex;
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .editor-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            position: relative;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .editor-pane:last-child {
+            border-right: none;
+        }
+
         .tab-bar {
             height: 35px;
             background: var(--tab-bg);
@@ -456,7 +477,7 @@
             padding-right: 8px;
         }
 
-        textarea#editor {
+        .rupl-editor {
             flex: 1;
             background: transparent;
             margin: 0;
@@ -495,6 +516,35 @@
         ::-webkit-scrollbar-thumb {
             background: #424242;
             border-radius: 5px;
+        }
+
+        /* Minimap */
+        #minimapContainer {
+            width: 80px;
+            flex-shrink: 0;
+            position: relative;
+            background: var(--bg-color);
+            border-left: 1px solid var(--border-color);
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        #minimapCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #minimapSlider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(100, 150, 255, 0.15);
+            border: 1px solid rgba(100, 150, 255, 0.4);
+            pointer-events: none;
+            box-sizing: border-box;
+            transition: top 0.05s linear;
         }
 
         footer {
@@ -750,6 +800,7 @@
                 Выйти</button>
             <button class="btn btn-blue" onclick="selFolder()">📂 Папка</button>
             <button class="btn btn-green" onclick="showNewFile()">➕ Файл</button>
+            <button class="btn btn-gray" onclick="toggleSplitView()" title="Split View">◫ Разделить</button>
             <div
                 style="display: flex; align-items: center; background: #252526; padding: 0 8px; border-radius: 3px; border: 1px solid #444;">
                 <input type="checkbox" id="autoSaveCheck" style="margin-right: 5px; cursor: pointer;">
@@ -777,6 +828,7 @@
             <div class="sidebar-tabs">
                 <div class="sidebar-tab active" id="tabExplorer" onclick="switchSidebar('explorer')">ФАЙЛЫ</div>
                 <div class="sidebar-tab" id="tabProjects" onclick="switchSidebar('projects')">ПРОЕКТЫ</div>
+                <div class="sidebar-tab" id="tabNotes" onclick="switchSidebar('notes')">ЗАМЕТКИ</div>
             </div>
 
             <!-- EXPLORER VIEW -->
@@ -799,37 +851,84 @@
                     <!-- Projects injected here -->
                 </ul>
             </div>
+
+            <!-- NOTES VIEW -->
+            <div id="viewNotes" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="sidebar-header">
+                    <span>МОИ ЗАМЕТКИ</span>
+                    <button class="btn btn-blue" style="padding: 2px 6px; font-size: 10px;" onclick="showNewNote()">+
+                        Новая</button>
+                </div>
+                <!-- Adding a wrapper to allow scrolling multiple large note blocks -->
+                <div style="flex:1; overflow-y:auto; padding-bottom: 20px;">
+                    <ul id="notesUI" class="file-list" style="padding: 0 10px;">
+                        <!-- Notes injected here -->
+                    </ul>
+                </div>
+            </div>
         </div>
         <div class="editor-container">
-            <div class="tab-bar" id="tabBarContainer">
-                <!-- Tabs rendered here dynamically -->
-            </div>
-            <div class="code-wrapper">
-                <div id="gutter" class="gutter"></div>
-                <div style="position: relative; flex: 1; overflow: hidden;" id="editorContainer">
+            <div class="split-container" id="splitContainer">
 
-                    <!-- Find & Replace Widget -->
-                    <div id="findReplace">
-                        <div class="fr-row">
-                            <input type="text" id="frFindInput" class="fr-input" placeholder="Найти...">
-                            <button class="fr-btn" id="frPrev" title="Предыдущее (Shift+Enter)">▲</button>
-                            <button class="fr-btn" id="frNext" title="Следующее (Enter)">▼</button>
-                            <button class="fr-btn" onclick="closeFindReplace()" style="color:#ff6b6b">✕</button>
-                        </div>
-                        <div class="fr-row">
-                            <input type="text" id="frReplaceInput" class="fr-input" placeholder="Заменить на...">
-                            <button class="fr-btn" id="frReplaceBtn" title="Заменить (Enter)">Заменить</button>
-                            <button class="fr-btn" id="frReplaceAllBtn">Все</button>
-                        </div>
-                        <div class="fr-msg" id="frMsg">Нет совпадений</div>
+                <!-- PANE 1 -->
+                <div class="editor-pane" id="pane1" onclick="setActivePane(1)">
+                    <div class="tab-bar" id="tabBarContainer1">
+                        <!-- Tabs rendered here dynamically -->
                     </div>
+                    <div class="code-wrapper">
+                        <div id="gutter1" class="gutter"></div>
+                        <div style="position: relative; flex: 1; overflow: hidden;" id="editorContainer1">
 
-                    <textarea id="editor" spellcheck="false"
-                        placeholder="// Roode v2.5 (Projects & Cloud Sync - Node.js Backend)"></textarea>
+                            <!-- Find & Replace Widget (Shared globally, but placed here visually or moved) -->
+                            <div id="findReplace" style="display:none;">
+                                <div class="fr-row">
+                                    <input type="text" id="frFindInput" class="fr-input" placeholder="Найти...">
+                                    <button class="fr-btn" id="frPrev" title="Предыдущее (Shift+Enter)">▲</button>
+                                    <button class="fr-btn" id="frNext" title="Следующее (Enter)">▼</button>
+                                    <button class="fr-btn" onclick="closeFindReplace()" style="color:#ff6b6b">✕</button>
+                                </div>
+                                <div class="fr-row">
+                                    <input type="text" id="frReplaceInput" class="fr-input"
+                                        placeholder="Заменить на...">
+                                    <button class="fr-btn" id="frReplaceBtn" title="Заменить (Enter)">Заменить</button>
+                                    <button class="fr-btn" id="frReplaceAllBtn">Все</button>
+                                </div>
+                                <div class="fr-msg" id="frMsg">Нет совпадений</div>
+                            </div>
 
-                    <!-- Autocomplete Popup -->
-                    <ul id="autocomplete"></ul>
+                            <textarea id="editor1" class="rupl-editor" spellcheck="false"
+                                placeholder="// Roode v2.5 (Projects & Cloud Sync - Node.js Backend)"></textarea>
+
+                            <!-- Autocomplete Popup -->
+                            <ul id="autocomplete"></ul>
+                        </div>
+                        <!-- Minimap -->
+                        <div id="minimapContainer1" class="minimap-container">
+                            <canvas id="minimapCanvas1"></canvas>
+                            <div id="minimapSlider1" class="minimap-slider"></div>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- PANE 2 (Hidden by default) -->
+                <div class="editor-pane" id="pane2" onclick="setActivePane(2)" style="display: none;">
+                    <div class="tab-bar" id="tabBarContainer2">
+                        <!-- Tabs rendered here dynamically -->
+                    </div>
+                    <div class="code-wrapper">
+                        <div id="gutter2" class="gutter"></div>
+                        <div style="position: relative; flex: 1; overflow: hidden;" id="editorContainer2">
+                            <textarea id="editor2" class="rupl-editor" spellcheck="false"
+                                placeholder="// Pane 2"></textarea>
+                        </div>
+                        <!-- Minimap 2 -->
+                        <div id="minimapContainer2" class="minimap-container">
+                            <canvas id="minimapCanvas2"></canvas>
+                            <div id="minimapSlider2" class="minimap-slider"></div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -894,7 +993,18 @@
         </div>
     </div>
 
-    <!-- AUTH MODAL -->
+    <!-- NEW NOTE OVERLAY -->
+    <div class="overlay" id="newNoteOverlay" style="display: none;">
+        <div class="modal">
+            <h3>📝 Новая Заметка</h3>
+            <input id="noteNameInput" placeholder="Название заметки (Например: Идеи для ИИ)">
+            <div class="modal-buttons">
+                <button class="btn btn-green" onclick="createNote()">Создать</button>
+                <button class="btn btn-gray"
+                    onclick="document.getElementById('newNoteOverlay').style.display='none'">Отмена</button>
+            </div>
+        </div>
+    </div>
     <div class="overlay" id="modAuth" style="z-index: 1000; background: var(--bg-color);">
         <div class="modal" id="authBox">
             <h3 id="authTitle" style="margin-top:0">Вход</h3>
@@ -973,6 +1083,7 @@
         let fHandle = null, fileH = null, isDir = false;
         let filesCache = [];
         let projectMemory = {};
+        let notesCache = []; // Internal array of notes metadata
         let isCreating = false;
         let autoSaveTimer = null;
 
@@ -998,14 +1109,219 @@
         let isHost = false; // true if creator, false if joiner
         let collabUsers = {}; // dict mapping socket.id -> { username, role: 'reader'|'editor' }
         let mouseNodes = {}; // dict mapping socket.id -> DOM element for Figma cursor
-
-        const ed = document.getElementById('editor');
-        const gut = document.getElementById('gutter');
+        // --- SPLIT PANE STATE ---
         const ui = document.getElementById('listUI');
         const msg = document.getElementById('msg');
-        const tabBar = document.getElementById('tabBarContainer');
         const label = document.getElementById('labelHeader');
         const menu = document.getElementById('mainMenu');
+
+        let activePaneId = 1;
+
+        const panes = {
+            1: {
+                ed: document.getElementById('editor1'),
+                gut: document.getElementById('gutter1'),
+                tabBar: document.getElementById('tabBarContainer1'),
+                minimapCanvas: document.getElementById('minimapCanvas1'),
+                minimapContainer: document.getElementById('minimapContainer1'),
+                minimapSlider: document.getElementById('minimapSlider1'),
+                openTabs: [],
+                fileH: null
+            },
+            2: {
+                ed: document.getElementById('editor2'),
+                gut: document.getElementById('gutter2'),
+                tabBar: document.getElementById('tabBarContainer2'),
+                minimapCanvas: document.getElementById('minimapCanvas2'),
+                minimapContainer: document.getElementById('minimapContainer2'),
+                minimapSlider: document.getElementById('minimapSlider2'),
+                openTabs: [],
+                fileH: null
+            }
+        };
+
+        // For backwards compatibility and ease of refactoring, define getters for the active pane
+        Object.defineProperty(window, 'ed', { get: () => panes[activePaneId].ed });
+        Object.defineProperty(window, 'gut', { get: () => panes[activePaneId].gut });
+        Object.defineProperty(window, 'tabBar', { get: () => panes[activePaneId].tabBar });
+        Object.defineProperty(window, 'openTabs', { get: () => panes[activePaneId].openTabs, set: (val) => panes[activePaneId].openTabs = val });
+        Object.defineProperty(window, 'fileH', { get: () => panes[activePaneId].fileH, set: (val) => panes[activePaneId].fileH = val });
+
+        window.setActivePane = function (id) {
+            activePaneId = id;
+            document.querySelectorAll('.editor-pane').forEach(el => el.style.borderColor = 'var(--border-color)');
+            document.getElementById('pane' + id).style.borderColor = 'var(--accent-color)';
+            updateCursorStats();
+            renderTabs();
+        }
+
+        window.toggleSplitView = function () {
+            const pane2 = document.getElementById('pane2');
+            if (pane2.style.display === 'none') {
+                pane2.style.display = 'flex';
+                setActivePane(2);
+                notify("Режим Split View включен");
+                // Trigger redraw of canvas elements
+                setTimeout(() => {
+                    updateLines();
+                    scheduleMinimapRender();
+                    setActivePane(1);
+                    updateLines();
+                    scheduleMinimapRender();
+                    setActivePane(2);
+                }, 50);
+            } else {
+                pane2.style.display = 'none';
+                setActivePane(1);
+                notify("Режим Split View выключен");
+            }
+        }
+
+        // --- MINIMAP --- (Refactored to support active pane)
+        let minimapDragging = false;
+
+        function renderMinimap() {
+            const pane = panes[activePaneId];
+            const text = pane.ed.value;
+            const lines = text.split('\n');
+            const cW = pane.minimapContainer.clientWidth;
+            const cH = pane.minimapContainer.clientHeight;
+            const ctx = pane.minimapCanvas.getContext('2d');
+
+            pane.minimapCanvas.width = cW * devicePixelRatio;
+            pane.minimapCanvas.height = cH * devicePixelRatio;
+            pane.minimapCanvas.style.width = cW + 'px';
+            pane.minimapCanvas.style.height = cH + 'px';
+            ctx.scale(devicePixelRatio, devicePixelRatio);
+            ctx.clearRect(0, 0, cW, cH);
+
+            const lineH = 3;
+            const gap = 1;
+            const charW = 1.2;
+            const padLeft = 4;
+            const totalH = lines.length * (lineH + gap);
+            const scale = totalH > cH ? cH / totalH : 1;
+
+            const colors = {
+                default: 'rgba(204, 204, 204, 0.5)',
+                comment: 'rgba(106, 153, 85, 0.6)',
+                string: 'rgba(206, 145, 120, 0.6)',
+                keyword: 'rgba(86, 156, 214, 0.7)',
+                number: 'rgba(181, 206, 168, 0.6)'
+            };
+
+            for (let i = 0; i < lines.length; i++) {
+                const y = i * (lineH + gap) * scale;
+                const line = lines[i];
+                const trimmed = line.trimStart();
+                const indent = line.length - trimmed.length;
+                let color = colors.default;
+                if (trimmed.startsWith('//') || trimmed.startsWith('#')) color = colors.comment;
+                else if (trimmed.startsWith('"') || trimmed.startsWith("'") || trimmed.startsWith('`')) color = colors.string;
+                else if (/^(function|const|let|var|if|else|return|for|while|class|import|export)\b/.test(trimmed)) color = colors.keyword;
+                else if (/^\d/.test(trimmed)) color = colors.number;
+
+                ctx.fillStyle = color;
+
+                if (scale >= 0.5) {
+                    const fontSize = Math.max(3, 4.5 * scale);
+                    ctx.font = `bold ${fontSize}px monospace`;
+                    ctx.textBaseline = "top";
+                    ctx.fillText(trimmed, padLeft + indent * 1.5 * scale, y, cW - padLeft - 2);
+                } else {
+                    const drawW = Math.min(trimmed.length * charW, cW - padLeft - 4);
+                    if (drawW > 0) {
+                        ctx.fillRect(padLeft + indent * charW * 0.5, y, drawW, lineH * scale < 1 ? 1 : lineH * scale);
+                    }
+                }
+            }
+            updateMinimapSlider();
+        }
+
+        function updateMinimapSlider() {
+            const pane = panes[activePaneId];
+            const cH = pane.minimapContainer.clientHeight;
+            const lines = pane.ed.value.split('\n');
+            const lineH = 3;
+            const gap = 1;
+            const totalH = lines.length * (lineH + gap);
+            const scale = totalH > cH ? cH / totalH : 1;
+
+            const edLineH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--editor-line-height'));
+            const visibleLines = Math.floor(pane.ed.clientHeight / edLineH);
+            const scrollFraction = pane.ed.scrollHeight > pane.ed.clientHeight ? pane.ed.scrollTop / (pane.ed.scrollHeight - pane.ed.clientHeight) : 0;
+            const sliderH = Math.max(20, visibleLines * (lineH + gap) * scale);
+            const maxTop = cH - sliderH;
+            const top = maxTop * scrollFraction;
+
+            pane.minimapSlider.style.height = sliderH + 'px';
+            pane.minimapSlider.style.top = top + 'px';
+        }
+
+        function bindEditorEvents(paneId) {
+            const pane = panes[paneId];
+            pane.ed.addEventListener('scroll', () => {
+                if (activePaneId === paneId) updateMinimapSlider();
+                pane.gut.scrollTop = pane.ed.scrollTop;
+            });
+            pane.ed.addEventListener('input', () => {
+                if (activePaneId === paneId) {
+                    renderMinimap();
+                    updateLines();
+                    updateCursorStats();
+                    if (!isDir && pane.fileH) projectMemory[pane.fileH.name] = pane.ed.value;
+
+                    if (autoSaveBox.checked && pane.fileH) {
+                        clearTimeout(autoSaveTimer);
+                        autoSaveTimer = setTimeout(() => {
+                            save(true);
+                        }, 1000);
+                    }
+                }
+            });
+            pane.ed.addEventListener('keydown', () => { if (activePaneId === paneId) setTimeout(updateLines, 0); });
+            pane.ed.addEventListener('keyup', () => {
+                if (activePaneId === paneId) {
+                    updateCursorStats();
+                    if (socket && activeRoom) {
+                        socket.emit('cursor-move', { roomId: activeRoom, file: pane.fileH ? pane.fileH.name : 'shared', pos: pane.ed.selectionStart });
+                    }
+                }
+            });
+            pane.ed.addEventListener('click', () => {
+                if (activePaneId === paneId) {
+                    updateCursorStats();
+                    if (socket && activeRoom) {
+                        socket.emit('cursor-move', { roomId: activeRoom, file: pane.fileH ? pane.fileH.name : 'shared', pos: pane.ed.selectionStart });
+                    }
+                }
+            });
+
+            pane.minimapContainer.addEventListener('mousedown', (e) => {
+                setActivePane(paneId);
+                minimapDragging = true;
+                minimapJumpTo(e, paneId);
+            });
+        }
+
+        bindEditorEvents(1);
+        bindEditorEvents(2);
+
+        window.addEventListener('mousemove', (e) => {
+            if (minimapDragging) minimapJumpTo(e, activePaneId);
+        });
+        window.addEventListener('mouseup', () => { minimapDragging = false; });
+
+        function minimapJumpTo(e, paneId) {
+            const pane = panes[paneId];
+            const rect = pane.minimapContainer.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const fraction = y / rect.height;
+            pane.ed.scrollTop = fraction * (pane.ed.scrollHeight - pane.ed.clientHeight);
+        }
+
+        const _origRenderMinimap = renderMinimap;
+        function scheduleMinimapRender() { requestAnimationFrame(() => _origRenderMinimap()); }
 
         // --- AUTH LOGIC ---
 
@@ -1110,16 +1426,23 @@
         function switchSidebar(view) {
             document.getElementById('tabExplorer').classList.remove('active');
             document.getElementById('tabProjects').classList.remove('active');
+            document.getElementById('tabNotes').classList.remove('active');
             document.getElementById('viewExplorer').style.display = 'none';
             document.getElementById('viewProjects').style.display = 'none';
+            document.getElementById('viewNotes').style.display = 'none';
 
             if (view === 'explorer') {
                 document.getElementById('tabExplorer').classList.add('active');
                 document.getElementById('viewExplorer').style.display = 'flex';
-            } else {
+            } else if (view === 'projects') {
                 document.getElementById('tabProjects').classList.add('active');
                 document.getElementById('viewProjects').style.display = 'flex';
                 loadProjects();
+            } else if (view === 'notes') {
+                document.getElementById('tabNotes').classList.add('active');
+                document.getElementById('viewNotes').style.display = 'flex';
+                // loadNotes() is called globally on app start, but we can re-render to be safe
+                renderNotes();
             }
         }
 
@@ -1128,6 +1451,9 @@
         autoSaveBox.addEventListener('change', (e) => {
             localStorage.setItem('roode_autosave', e.target.checked);
         });
+
+        // Initialize Local Features
+        loadNotes();
 
         // Font Size Logic
         let currentFontSize = parseInt(localStorage.getItem('roode_font_size')) || 14;
@@ -2004,7 +2330,15 @@
             document.getElementById('activeProjectLabel').style.color = "var(--text-color)";
             document.getElementById('activeProjectStatus').style.backgroundColor = "#f44";
             document.getElementById('activeProjectStatus').style.boxShadow = "none";
-            label.textContent = "ПРОВОДНИК"; resetEd(); listRender();
+            label.textContent = "ПРОВОДНИК";
+
+            // Reset both panes
+            const prevActive = activePaneId;
+            setActivePane(1); resetEd();
+            setActivePane(2); resetEd();
+            setActivePane(prevActive);
+
+            listRender();
             if (document.getElementById('tabProjects').classList.contains('active')) renderProjects();
         }
 
@@ -2024,7 +2358,7 @@
             } catch (e) { }
         }
 
-        function resetEd() { fileH = null; ed.value = ''; openTabs = []; renderTabs(); updateLines(); }
+        function resetEd() { fileH = null; ed.value = ''; openTabs = []; renderTabs(); updateLines(); scheduleMinimapRender(); }
 
         function getFileIcon(filename) {
             const ext = filename.split('.').pop().toLowerCase();
@@ -2100,14 +2434,24 @@
                 delete projectMemory[h.name];
             }
 
-            openTabs = openTabs.filter(x => x.name !== h.name);
+            // Remove from both panes
+            [1, 2].forEach(pId => {
+                const pane = panes[pId];
+                pane.openTabs = pane.openTabs.filter(x => x.name !== h.name);
+                if (pane.fileH && pane.fileH.name === h.name) {
+                    const prevActive = activePaneId;
+                    setActivePane(pId);
+                    if (pane.openTabs.length > 0) load(pane.openTabs[pane.openTabs.length - 1].h);
+                    else resetEd();
+                    setActivePane(prevActive);
+                }
+            });
 
-            if (fileH && fileH.name === h.name) {
-                if (openTabs.length > 0) load(openTabs[openTabs.length - 1].h);
-                else resetEd();
-            } else {
-                renderTabs();
-            }
+            renderTabs();
+            // also render tabs for non-active pane manually
+            const inactivePaneId = activePaneId === 1 ? 2 : 1;
+            renderTabsForPane(inactivePaneId);
+
             listRender();
         }
 
@@ -2143,11 +2487,16 @@
         }
 
         function renderTabs() {
-            tabBar.innerHTML = '';
-            if (openTabs.length === 0) return;
+            renderTabsForPane(activePaneId);
+        }
 
-            openTabs.forEach(tabObj => {
-                const isActive = (fileH && fileH.name === tabObj.name);
+        function renderTabsForPane(pId) {
+            const pane = panes[pId];
+            pane.tabBar.innerHTML = '';
+            if (pane.openTabs.length === 0) return;
+
+            pane.openTabs.forEach(tabObj => {
+                const isActive = (pane.fileH && pane.fileH.name === tabObj.name);
                 const t = document.createElement('div');
                 t.className = 'tab' + (isActive ? ' active' : '');
 
@@ -2155,23 +2504,27 @@
                 t.innerHTML = `<span style="display:flex; align-items:center; gap:3px;">${getFileIcon(tabObj.name)} ${tabObj.name}${dirtyMark}</span><span class="tab-close">×</span>`;
 
                 t.onclick = (e) => {
+                    setActivePane(pId); // Switch active pane when clicking a tab
                     if (e.target.className === 'tab-close') {
                         e.stopPropagation();
-                        // Close tab
-                        openTabs = openTabs.filter(x => x.name !== tabObj.name);
-                        delete projectMemory[tabObj.name]; // clear memory to reload from disk later
+                        pane.openTabs = pane.openTabs.filter(x => x.name !== tabObj.name);
+
+                        // Only clear memory if it's not open in the OTHER pane too
+                        const otherPaneId = pId === 1 ? 2 : 1;
+                        const isOpenElsewhere = panes[otherPaneId].openTabs.some(x => x.name === tabObj.name);
+                        if (!isOpenElsewhere) delete projectMemory[tabObj.name];
 
                         if (isActive) {
-                            if (openTabs.length > 0) load(openTabs[openTabs.length - 1].h);
+                            if (pane.openTabs.length > 0) load(pane.openTabs[pane.openTabs.length - 1].h);
                             else resetEd();
                         } else {
-                            renderTabs();
+                            renderTabsForPane(pId);
                         }
                     } else {
                         load(tabObj.h);
                     }
                 };
-                tabBar.appendChild(t);
+                pane.tabBar.appendChild(t);
             });
         }
 
@@ -2228,6 +2581,7 @@
             msg.textContent = h.name;
             renderTabs();
             updateLines();
+            scheduleMinimapRender();
             updateCursorStats();
         }
 
@@ -2238,7 +2592,14 @@
             let currentTab = openTabs.find(t => t.name === fileH.name);
             if (currentTab) currentTab.isDirty = false;
 
-            if (isDir) {
+            if (fileH.isNote) {
+                const note = notesCache.find(n => n.id === fileH.id);
+                if (note) {
+                    note.content = ed.value;
+                    saveNotes();
+                    if (!isSilent) notify(`Заметка сохранена`);
+                }
+            } else if (isDir) {
                 const w = await fileH.createWritable(); await w.write(ed.value); await w.close();
                 if (!isSilent) notify(`Saved: ${fileH.name}`);
             } else {
@@ -2290,6 +2651,103 @@
             } finally {
                 isCreating = false;
             }
+        }
+
+        // --- NOTES SYSTEM LOGIC ---
+        window.saveNotes = function () {
+            localStorage.setItem('roode_notes', JSON.stringify(notesCache));
+        }
+
+        window.loadNotes = function () {
+            try {
+                const raw = localStorage.getItem('roode_notes');
+                if (raw) notesCache = JSON.parse(raw);
+            } catch (e) { console.error(e); }
+            renderNotes();
+        }
+
+        window.renderNotes = function () {
+            const list = document.getElementById('notesUI');
+            list.innerHTML = '';
+            if (notesCache.length === 0) {
+                list.innerHTML = '<div style="padding:10px; color:#aaa; font-size:12px; text-align:center;">Нет заметок. Нажмите + Новая</div>';
+                return;
+            }
+
+            notesCache.forEach(note => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                if (fileH && fileH.id === note.id) li.classList.add('active');
+
+                // Generate a fake 'handle' for the tab-system and load-system
+                const noteHandle = { name: "📝 " + note.title, id: note.id, isNote: true, kind: 'file' };
+
+                li.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;">
+                        <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;">📝 ${note.title}</span>
+                        <span onclick="deleteNote(event, '${note.id}')" style="cursor:pointer; color:#f44; padding:0 5px;" title="Удалить">🗑</span>
+                    </span>
+                `;
+                li.onclick = () => {
+                    projectMemory[noteHandle.name] = note.content;
+                    load(noteHandle);
+                };
+                list.appendChild(li);
+            });
+        }
+
+        window.showNewNote = function () {
+            document.getElementById('noteNameInput').value = '';
+            document.getElementById('newNoteOverlay').style.display = 'flex';
+            document.getElementById('noteNameInput').focus();
+        }
+
+        window.createNote = function () {
+            const title = document.getElementById('noteNameInput').value.trim();
+            if (!title) return;
+            const newNote = {
+                id: 'note_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                title: title,
+                content: ''
+            };
+            notesCache.push(newNote);
+            saveNotes();
+            renderNotes();
+
+            document.getElementById('newNoteOverlay').style.display = 'none';
+            // Open the created note immediately
+            const noteHandle = { name: "📝 " + title, id: newNote.id, isNote: true, kind: 'file' };
+            projectMemory[noteHandle.name] = '';
+            load(noteHandle);
+        }
+
+        window.deleteNote = function (e, id) {
+            e.stopPropagation();
+            if (!confirm('Удалить эту заметку навсегда?')) return;
+
+            const noteIndex = notesCache.findIndex(n => n.id === id);
+            if (noteIndex === -1) return;
+
+            const noteName = "📝 " + notesCache[noteIndex].title;
+            notesCache.splice(noteIndex, 1);
+            saveNotes();
+            renderNotes();
+
+            // Clear from open tabs on both panes
+            [1, 2].forEach(pId => {
+                const pane = panes[pId];
+                pane.openTabs = pane.openTabs.filter(x => x.name !== noteName);
+                if (pane.fileH && pane.fileH.name === noteName) {
+                    const prevActive = activePaneId;
+                    setActivePane(pId);
+                    if (pane.openTabs.length > 0) load(pane.openTabs[pane.openTabs.length - 1].h);
+                    else resetEd();
+                    setActivePane(prevActive);
+                }
+            });
+            delete projectMemory[noteName];
+            renderTabs();
+            renderTabsForPane(activePaneId === 1 ? 2 : 1);
         }
 
         // Shortcuts
