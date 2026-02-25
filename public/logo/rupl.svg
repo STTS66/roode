@@ -1,4 +1,4 @@
-<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="256" height="256" viewBox="-20 -20 296 296" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Outer Glow / Drop Shadow effect simulated via a soft circle backing -->
   <circle cx="128" cy="128" r="120" fill="#000000" opacity="0.15" filter="url(#glow)"/>
 
