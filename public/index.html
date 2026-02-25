@@ -519,29 +519,30 @@
         }
 
         /* Minimap */
-        #minimapContainer {
-            width: 80px;
+        .minimap-container {
+            width: 50px;
             flex-shrink: 0;
             position: relative;
             background: var(--bg-color);
-            border-left: 1px solid var(--border-color);
             cursor: pointer;
             overflow: hidden;
         }
 
-        #minimapCanvas {
+        .minimap-container canvas {
             width: 100%;
             height: 100%;
             display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
 
-        #minimapSlider {
+        .minimap-slider {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
-            background: rgba(100, 150, 255, 0.15);
-            border: 1px solid rgba(100, 150, 255, 0.4);
+            background: rgba(100, 150, 255, 0.1);
+            border: 1px solid rgba(100, 150, 255, 0.25);
             pointer-events: none;
             box-sizing: border-box;
             transition: top 0.05s linear;
@@ -1207,12 +1208,13 @@
             pane.minimapCanvas.style.width = cW + 'px';
             pane.minimapCanvas.style.height = cH + 'px';
             ctx.scale(devicePixelRatio, devicePixelRatio);
+            ctx.imageSmoothingEnabled = false;
             ctx.clearRect(0, 0, cW, cH);
 
-            const lineH = 3;
+            const lineH = 2;
             const gap = 1;
-            const charW = 1.2;
-            const padLeft = 4;
+            const charW = 1;
+            const padLeft = 2;
             const totalH = lines.length * (lineH + gap);
             const scale = totalH > cH ? cH / totalH : 1;
 
@@ -1249,7 +1251,7 @@
             const pane = panes[activePaneId];
             const cH = pane.minimapContainer.clientHeight;
             const lines = pane.ed.value.split('\n');
-            const lineH = 3;
+            const lineH = 2;
             const gap = 1;
             const totalH = lines.length * (lineH + gap);
             const scale = totalH > cH ? cH / totalH : 1;
