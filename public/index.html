@@ -520,7 +520,7 @@
 
         /* Minimap */
         .minimap-container {
-            width: 60px;
+            width: 80px;
             flex-shrink: 0;
             position: relative;
             background: var(--bg-color);
@@ -1201,23 +1201,29 @@
             const lines = text.split('\n');
             const cW = pane.minimapContainer.clientWidth;
             const cH = pane.minimapContainer.clientHeight;
-            const ctx = pane.minimapCanvas.getContext('2d', { alpha: true });
+            const dpr = window.devicePixelRatio || 1;
+            const ctx = pane.minimapCanvas.getContext('2d');
 
-            // Draw at 1:1 pixel ratio — no DPR scaling, no blur
-            pane.minimapCanvas.width = cW;
-            pane.minimapCanvas.height = cH;
-            ctx.imageSmoothingEnabled = false;
+            // High-res canvas for crisp text
+            pane.minimapCanvas.width = cW * dpr;
+            pane.minimapCanvas.height = cH * dpr;
+            pane.minimapCanvas.style.width = cW + 'px';
+            pane.minimapCanvas.style.height = cH + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.clearRect(0, 0, cW, cH);
 
-            const lineH = 2;
-            const gap = 1;
-            const charW = 1.2;
-            const padLeft = 4;
-            const totalH = lines.length * (lineH + gap);
+            const fontSize = 4;
+            const lineH = fontSize + 1;
+            const padLeft = 2;
+            const totalH = lines.length * lineH;
             const scale = totalH > cH ? cH / totalH : 1;
+            const drawLineH = lineH * scale;
+
+            ctx.font = `${fontSize}px monospace`;
+            ctx.textBaseline = 'top';
 
             const colors = {
-                default: '#cccccc',
+                default: 'rgba(204,204,204,0.8)',
                 comment: '#6a9955',
                 string: '#ce9178',
                 keyword: '#569cd6',
@@ -1225,11 +1231,13 @@
             };
 
             for (let i = 0; i < lines.length; i++) {
-                const y = (i * (lineH + gap) * scale) | 0;
+                const y = i * drawLineH;
+                if (y > cH) break;
                 const line = lines[i];
                 const trimmed = line.trimStart();
                 if (trimmed.length === 0) continue;
                 const indent = line.length - trimmed.length;
+
                 let color = colors.default;
                 if (trimmed.startsWith('//') || trimmed.startsWith('#')) color = colors.comment;
                 else if (trimmed.startsWith('"') || trimmed.startsWith("'") || trimmed.startsWith('`')) color = colors.string;
@@ -1237,14 +1245,12 @@
                 else if (/^\d/.test(trimmed)) color = colors.number;
 
                 ctx.fillStyle = color;
-                ctx.globalAlpha = 0.7;
-
-                const x = (padLeft + indent * charW * 0.5) | 0;
-                const w = Math.min((trimmed.length * charW) | 0, cW - x - 2);
-                const h = Math.max(1, (lineH * scale) | 0);
-                if (w > 0) ctx.fillRect(x, y, w, h);
+                // Truncate long lines to fit the minimap width
+                const maxChars = Math.floor((cW - padLeft) / (fontSize * 0.5));
+                const displayText = trimmed.length > maxChars ? trimmed.substring(0, maxChars) : trimmed;
+                const x = padLeft + indent * (fontSize * 0.25);
+                ctx.fillText(displayText, x, y);
             }
-            ctx.globalAlpha = 1;
             updateMinimapSlider();
         }
 
@@ -1252,8 +1258,8 @@
             const pane = panes[activePaneId];
             const cH = pane.minimapContainer.clientHeight;
             const lines = pane.ed.value.split('\n');
-            const lineH = 2;
-            const gap = 1;
+            const lineH = 5;
+            const gap = 0;
             const totalH = lines.length * (lineH + gap);
             const scale = totalH > cH ? cH / totalH : 1;
 
