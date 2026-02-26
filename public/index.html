@@ -2599,12 +2599,13 @@
                     const f = await h.getFile();
                     const content = projectMemory[h.name] !== undefined ? projectMemory[h.name] : await f.text();
 
-                    const newHandle = await fHandle.getFileHandle(newName, { create: true });
+                    const parent = h._parentHandle || fHandle;
+                    const newHandle = await parent.getFileHandle(newName, { create: true });
                     const w = await newHandle.createWritable();
                     await w.write(content);
                     await w.close();
 
-                    await fHandle.removeEntry(h.name);
+                    await parent.removeEntry(h.name);
 
                     let tab = openTabs.find(t => t.name === h.name);
                     if (tab) {
@@ -2636,7 +2637,8 @@
             if (!confirm(`Удалить файл ${h.name}?`)) return;
 
             if (isDir) {
-                await fHandle.removeEntry(h.name);
+                const parent = h._parentHandle || fHandle;
+                await parent.removeEntry(h.name);
             } else {
                 filesCache = filesCache.filter(x => x.name !== h.name);
                 delete projectMemory[h.name];
