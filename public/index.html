@@ -1576,6 +1576,20 @@
         };
         applyFontSize();
 
+        // Font Weight Logic
+        let currentFontWeight = localStorage.getItem('roode_fontWeight') || 'normal';
+        function applyFontWeight() {
+            document.documentElement.style.setProperty('--editor-font-weight', currentFontWeight);
+            const sel = document.getElementById('fontWeightSelect');
+            if (sel) sel.value = currentFontWeight;
+        }
+        window.changeFontWeight = function () {
+            currentFontWeight = document.getElementById('fontWeightSelect').value;
+            localStorage.setItem('roode_fontWeight', currentFontWeight);
+            applyFontWeight();
+        };
+        applyFontWeight();
+
         // Theme Logic
         let currentTheme = localStorage.getItem('roode_theme') || 'dark';
         function applyTheme() {
