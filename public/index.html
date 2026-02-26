@@ -1229,6 +1229,11 @@
         <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFileCtx()">🗑 Удалить</div>
     </div>
 
+    <!-- Folder Context Menu -->
+    <div id="folderContextMenu" class="dropdown">
+        <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFolderCtx()">🗑 Удалить папку</div>
+    </div>
+
     <script type="module">
         import { get, set, del } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 
@@ -2562,9 +2567,12 @@
         }
 
         let contextMenuTarget = null;
+        let contextFolderTarget = null; // { name, handle, parentHandle }
         window.addEventListener('click', () => {
             const menu = document.getElementById('fileContextMenu');
             if (menu) menu.style.display = 'none';
+            const fmenu = document.getElementById('folderContextMenu');
+            if (fmenu) fmenu.style.display = 'none';
         });
 
         async function renameFileCtx() {
@@ -2643,6 +2651,41 @@
             listRender();
         }
 
+        async function deleteFolderCtx() {
+            if (!contextFolderTarget) return;
+            const { name, parentHandle } = contextFolderTarget;
+            if (!confirm(`Удалить папку "${name}" и всё её содержимое?`)) return;
+            try {
+                await parentHandle.removeEntry(name, { recursive: true });
+                notify('🗑 Папка удалена: ' + name);
+                listRender();
+            } catch (e) {
+                alert('Ошибка удаления: ' + e.message);
+            }
+        }
+
+        async function moveFileToFolder(fileName, srcParentHint, destDirHandle) {
+            const srcParent = window._dragSourceParent;
+            const srcHandle = window._dragSourceHandle;
+            if (!srcParent || !srcHandle || !destDirHandle) return;
+            try {
+                // Read file content from source
+                const file = await srcHandle.getFile();
+                const content = await file.arrayBuffer();
+                // Create file in destination
+                const newFile = await destDirHandle.getFileHandle(fileName, { create: true });
+                const writable = await newFile.createWritable();
+                await writable.write(content);
+                await writable.close();
+                // Remove from source
+                await srcParent.removeEntry(fileName);
+                notify('📦 Перемещён: ' + fileName);
+                listRender();
+            } catch (e) {
+                alert('Ошибка перемещения: ' + e.message);
+            }
+        }
+
         async function listRender() {
             ui.innerHTML = '';
 
@@ -2658,7 +2701,7 @@
             }
         }
 
-        async function renderDirTree(dirHandle, parentEl) {
+        async function renderDirTree(dirHandle, parentEl, parentHandle) {
             const folders = [];
             const files = [];
 
@@ -2682,7 +2725,35 @@
                 const header = document.createElement('div');
                 header.className = 'folder-header';
                 header.innerHTML = `<span class="chevron">▶</span> 📁 ${folder.name}`;
-                header.onclick = () => folderEl.classList.toggle('open');
+
+                // Right-click on folder header
+                header.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    contextFolderTarget = { name: folder.name, handle: folder.handle, parentHandle: dirHandle };
+                    const menu = document.getElementById('folderContextMenu');
+                    menu.style.display = 'flex';
+                    menu.style.left = e.pageX + 'px';
+                    menu.style.top = e.pageY + 'px';
+                };
+
+                // Drop target: accept files dragged here
+                header.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    header.style.background = 'rgba(0,122,204,0.3)';
+                });
+                header.addEventListener('dragleave', () => {
+                    header.style.background = '';
+                });
+                header.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    header.style.background = '';
+                    const fileName = e.dataTransfer.getData('text/plain');
+                    const srcParent = e.dataTransfer.getData('application/x-parent');
+                    if (fileName) {
+                        await moveFileToFolder(fileName, srcParent === 'root' ? fHandle : null, folder.handle);
+                    }
+                });
 
                 const children = document.createElement('ul');
                 children.className = 'folder-children';
@@ -2699,21 +2770,23 @@
                 header.onclick = async () => {
                     if (!loaded) {
                         loaded = true;
-                        await renderDirTree(folder.handle, children);
+                        await renderDirTree(folder.handle, children, dirHandle);
                     }
                     folderEl.classList.toggle('open');
                 };
             }
 
             for (const h of files) {
-                parentEl.appendChild(createFileItem(h));
+                const item = createFileItem(h, dirHandle);
+                parentEl.appendChild(item);
             }
         }
 
-        function createFileItem(h) {
+        function createFileItem(h, parentDirHandle) {
             const li = document.createElement('li');
             li.className = 'file-item';
             li.dataset.name = h.name;
+            li.draggable = true;
 
             if (fileH && fileH.name === h.name) li.classList.add('active');
 
@@ -2723,11 +2796,26 @@
             li.oncontextmenu = (e) => {
                 e.preventDefault();
                 contextMenuTarget = h;
+                contextMenuTarget._parentHandle = parentDirHandle || fHandle;
                 const menu = document.getElementById('fileContextMenu');
                 menu.style.display = 'flex';
                 menu.style.left = e.pageX + 'px';
                 menu.style.top = e.pageY + 'px';
             };
+
+            // Drag start
+            li.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', h.name);
+                e.dataTransfer.setData('application/x-parent', parentDirHandle === fHandle ? 'root' : 'sub');
+                li.style.opacity = '0.4';
+                // Store source parent globally for the move
+                window._dragSourceParent = parentDirHandle || fHandle;
+                window._dragSourceHandle = h;
+            });
+            li.addEventListener('dragend', () => {
+                li.style.opacity = '1';
+            });
+
             return li;
         }
 
@@ -3478,6 +3566,8 @@
         window.showNewFile = showNewFile;
         window.createNewFolder = createNewFolder;
         window.collapseAllFolders = collapseAllFolders;
+        window.deleteFolderCtx = deleteFolderCtx;
+        window.moveFileToFolder = moveFileToFolder;
         window.save = save;
         window.toggleMenu = toggleMenu;
         window.saveAs = saveAs;
