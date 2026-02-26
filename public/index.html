@@ -2682,6 +2682,7 @@
             const srcParent = window._dragSourceParent;
             const srcHandle = window._dragSourceHandle;
             if (!srcParent || !srcHandle || !destDirHandle) return;
+            if (srcParent === destDirHandle) return; // same folder, do nothing
             try {
                 // Read file content from source
                 const file = await srcHandle.getFile();
@@ -2694,7 +2695,7 @@
                 // Remove from source
                 await srcParent.removeEntry(fileName);
                 notify('📦 Перемещён: ' + fileName);
-                listRender();
+                await listRender();
             } catch (e) {
                 alert('Ошибка перемещения: ' + e.message);
             }
@@ -2706,6 +2707,26 @@
             if (isDir && fHandle) {
                 // Recursive tree for directory handles
                 await renderDirTree(fHandle, ui);
+
+                // Root-level drop zone — drag files back here from subfolders
+                ui.addEventListener('dragover', (e) => {
+                    // Only highlight if dragging over the list itself, not a folder
+                    if (e.target === ui || e.target.closest('#listUI') === ui && !e.target.closest('.folder-header')) {
+                        e.preventDefault();
+                        ui.style.outline = '2px dashed rgba(0,122,204,0.5)';
+                    }
+                });
+                ui.addEventListener('dragleave', (e) => {
+                    if (e.target === ui) ui.style.outline = '';
+                });
+                ui.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    ui.style.outline = '';
+                    const fileName = e.dataTransfer.getData('text/plain');
+                    if (fileName && window._dragSourceParent && window._dragSourceParent !== fHandle) {
+                        await moveFileToFolder(fileName, null, fHandle);
+                    }
+                });
             } else if (!isDir) {
                 // Flat list for individually opened files
                 const list = [...filesCache].sort((a, b) => a.name.localeCompare(b.name));
@@ -2779,13 +2800,10 @@
                 folderEl.appendChild(children);
                 parentEl.appendChild(folderEl);
 
-                // Lazy-load children on first open
-                let loaded = false;
-                header.onclick = async () => {
-                    if (!loaded) {
-                        loaded = true;
-                        await renderDirTree(folder.handle, children, dirHandle);
-                    }
+                // Eager-load children so contents are always visible
+                await renderDirTree(folder.handle, children, dirHandle);
+
+                header.onclick = () => {
                     folderEl.classList.toggle('open');
                 };
             }
