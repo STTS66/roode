@@ -378,6 +378,47 @@
             background: rgba(255, 0, 0, 0.1);
         }
 
+        /* File Tree */
+        .tree-folder>.folder-header {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 13px;
+            color: var(--text-color);
+            border-radius: 3px;
+        }
+
+        .tree-folder>.folder-header:hover {
+            background: var(--hover-bg);
+        }
+
+        .tree-folder>.folder-children {
+            display: none;
+            padding-left: 12px;
+            border-left: 1px solid rgba(255, 255, 255, 0.06);
+            margin-left: 8px;
+        }
+
+        .tree-folder.open>.folder-children {
+            display: block;
+        }
+
+        .tree-folder>.folder-header .chevron {
+            display: inline-block;
+            width: 12px;
+            font-size: 10px;
+            text-align: center;
+            transition: transform 0.15s;
+            color: #888;
+        }
+
+        .tree-folder.open>.folder-header .chevron {
+            transform: rotate(90deg);
+        }
+
         .editor-container {
             flex: 1;
             display: flex;
@@ -2575,33 +2616,90 @@
 
         async function listRender() {
             ui.innerHTML = '';
-            let list = [];
+
             if (isDir && fHandle) {
-                for await (const [n, h] of fHandle.entries()) {
-                    if (h.kind === 'file' && !n.startsWith('.')) list.push(h); // Show all files except hidden
+                // Recursive tree for directory handles
+                await renderDirTree(fHandle, ui);
+            } else if (!isDir) {
+                // Flat list for individually opened files
+                const list = [...filesCache].sort((a, b) => a.name.localeCompare(b.name));
+                list.forEach(h => {
+                    ui.appendChild(createFileItem(h));
+                });
+            }
+        }
+
+        async function renderDirTree(dirHandle, parentEl) {
+            const folders = [];
+            const files = [];
+
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (name.startsWith('.')) continue;
+                if (handle.kind === 'directory') {
+                    folders.push({ name, handle });
+                } else {
+                    files.push(handle);
                 }
-            } else if (!isDir) list = [...filesCache];
+            }
 
-            list.sort((a, b) => a.name.localeCompare(b.name)).forEach(h => {
-                const li = document.createElement('li');
-                li.className = 'file-item';
-                li.dataset.name = h.name;
+            // Sort: folders first, then files, both alphabetical
+            folders.sort((a, b) => a.name.localeCompare(b.name));
+            files.sort((a, b) => a.name.localeCompare(b.name));
 
-                if (fileH && fileH.name === h.name) li.classList.add('active');
+            for (const folder of folders) {
+                const folderEl = document.createElement('li');
+                folderEl.className = 'tree-folder';
 
-                const ico = getFileIcon(h.name);
-                li.innerHTML = `<span style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;"><span style="width:16px; display:inline-block; text-align:center;">${ico}</span><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${h.name}</span></span>`;
-                li.onclick = () => load(h);
-                li.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    contextMenuTarget = h;
-                    const menu = document.getElementById('fileContextMenu');
-                    menu.style.display = 'flex';
-                    menu.style.left = e.pageX + 'px';
-                    menu.style.top = e.pageY + 'px';
+                const header = document.createElement('div');
+                header.className = 'folder-header';
+                header.innerHTML = `<span class="chevron">▶</span> 📁 ${folder.name}`;
+                header.onclick = () => folderEl.classList.toggle('open');
+
+                const children = document.createElement('ul');
+                children.className = 'folder-children';
+                children.style.listStyle = 'none';
+                children.style.padding = '0';
+                children.style.margin = '0';
+
+                folderEl.appendChild(header);
+                folderEl.appendChild(children);
+                parentEl.appendChild(folderEl);
+
+                // Lazy-load children on first open
+                let loaded = false;
+                header.onclick = async () => {
+                    if (!loaded) {
+                        loaded = true;
+                        await renderDirTree(folder.handle, children);
+                    }
+                    folderEl.classList.toggle('open');
                 };
-                ui.appendChild(li);
-            });
+            }
+
+            for (const h of files) {
+                parentEl.appendChild(createFileItem(h));
+            }
+        }
+
+        function createFileItem(h) {
+            const li = document.createElement('li');
+            li.className = 'file-item';
+            li.dataset.name = h.name;
+
+            if (fileH && fileH.name === h.name) li.classList.add('active');
+
+            const ico = getFileIcon(h.name);
+            li.innerHTML = `<span style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;"><span style="width:16px; display:inline-block; text-align:center;">${ico}</span><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${h.name}</span></span>`;
+            li.onclick = () => load(h);
+            li.oncontextmenu = (e) => {
+                e.preventDefault();
+                contextMenuTarget = h;
+                const menu = document.getElementById('fileContextMenu');
+                menu.style.display = 'flex';
+                menu.style.left = e.pageX + 'px';
+                menu.style.top = e.pageY + 'px';
+            };
+            return li;
         }
 
         function renderTabs() {
