@@ -419,6 +419,30 @@
             transform: rotate(90deg);
         }
 
+        /* Explorer Action Icons */
+        .explorer-actions {
+            display: flex;
+            gap: 2px;
+        }
+
+        .explorer-actions button {
+            background: transparent;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 14px;
+            line-height: 1;
+            opacity: 0.7;
+            transition: opacity 0.15s, background 0.15s;
+        }
+
+        .explorer-actions button:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
         .editor-container {
             flex: 1;
             display: flex;
@@ -896,8 +920,7 @@
                 style="font-size: 11px; margin-right: 10px; opacity: 0.8; display: none; align-items: center;"></span>
             <button class="btn btn-gray" id="btnLogout" onclick="logout()" style="display: none; margin-right: 5px;">🚪
                 Выйти</button>
-            <button class="btn btn-blue" onclick="selFolder()">📂 Папка</button>
-            <button class="btn btn-green" onclick="showNewFile()">➕ Файл</button>
+            <button class="btn btn-blue" onclick="selFolder()">📂 Открыть папку</button>
             <button class="btn btn-gray" onclick="toggleSplitView()" title="Split View">◫ Разделить</button>
             <div
                 style="display: flex; align-items: center; background: #252526; padding: 0 8px; border-radius: 3px; border: 1px solid #444; height: 26px;">
@@ -935,8 +958,14 @@
             <!-- EXPLORER VIEW -->
             <div id="viewExplorer" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
                 <div class="sidebar-header">
-                    <span id="labelHeader">ПРОВОДНИК</span>
-                    <span style="cursor:pointer" onclick="listRender()">↻</span>
+                    <span id="labelHeader"
+                        style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">ПРОВОДНИК</span>
+                    <div class="explorer-actions">
+                        <button onclick="showNewFile()" title="Новый файл">📄</button>
+                        <button onclick="createNewFolder()" title="Новая папка">📁</button>
+                        <button onclick="listRender()" title="Обновить">↻</button>
+                        <button onclick="collapseAllFolders()" title="Свернуть всё">⊟</button>
+                    </div>
                 </div>
                 <ul id="listUI" class="file-list"></ul>
             </div>
@@ -2844,6 +2873,25 @@
             document.getElementById('fname').focus();
         }
 
+        async function createNewFolder() {
+            if (!isDir || !fHandle) return alert('Сначала откройте папку');
+            const name = prompt('Имя новой папки:');
+            if (!name || !name.trim()) return;
+            try {
+                await fHandle.getDirectoryHandle(name.trim(), { create: true });
+                notify('📁 Папка создана: ' + name.trim());
+                listRender();
+            } catch (e) {
+                alert('Ошибка: ' + e.message);
+            }
+        }
+
+        function collapseAllFolders() {
+            document.querySelectorAll('#listUI .tree-folder.open').forEach(el => {
+                el.classList.remove('open');
+            });
+        }
+
         async function createFile() {
             if (isCreating) return;
 
@@ -3428,6 +3476,8 @@
         // Init global hooks for inline HTML onclick handlers since module scope encapsulates standard scripts
         window.selFolder = selFolder;
         window.showNewFile = showNewFile;
+        window.createNewFolder = createNewFolder;
+        window.collapseAllFolders = collapseAllFolders;
         window.save = save;
         window.toggleMenu = toggleMenu;
         window.saveAs = saveAs;
