@@ -38,6 +38,7 @@
             --editor-font: 'Consolas', 'Monaco', 'Courier New', monospace;
             --editor-size: 14px;
             --editor-line-height: 20px;
+            --editor-font-weight: normal;
         }
 
         body.theme-light {
@@ -477,28 +478,37 @@
             padding-right: 8px;
         }
 
+        /* Textarea overlay */
         .rupl-editor {
-            flex: 1;
-            background: transparent;
-            margin: 0;
-            border: none;
-            outline: none;
-            resize: none;
-            color: var(--text-color);
-            padding: 10px;
-            box-sizing: border-box;
-            font-family: var(--editor-font);
-            font-size: var(--editor-size);
-            line-height: var(--editor-line-height);
-            tab-size: 4;
-            white-space: pre;
-            word-wrap: normal;
-            overflow-wrap: normal;
-            overflow-x: scroll;
-            overflow-y: scroll;
             position: absolute;
             top: 0;
             left: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 10px;
+            /* Adjusted padding to match original */
+            box-sizing: border-box;
+            border: none;
+            outline: none;
+            resize: none;
+            background: transparent;
+            color: var(--text-color);
+            /* Changed to text-color as in original */
+            caret-color: #fff;
+            /* Changed to #fff as in original */
+            font-family: var(--editor-font);
+            font-size: var(--editor-size);
+            font-weight: var(--editor-font-weight);
+            line-height: var(--editor-line-height);
+            tab-size: 4;
+            /* Added tab-size from original */
+            white-space: pre;
+            word-wrap: normal;
+            /* Added word-wrap from original */
+            overflow-wrap: normal;
+            overflow-x: scroll;
+            overflow-y: scroll;
             width: 100%;
             height: 100%;
             caret-color: #fff;
@@ -1101,13 +1111,26 @@
                 </div>
 
 
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <label style="font-size: 13px;">Размер шрифта:</label>
                     <div class="font-controls" style="margin-right: 0;">
                         <button onclick="changeFontSize(-1)">A-</button>
                         <span id="fontSizeLabel">14</span>
                         <button onclick="changeFontSize(1)">A+</button>
                     </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label style="font-size: 13px;">Жирность шрифта:</label>
+                    <select id="fontWeightSelect" onchange="changeFontWeight()"
+                        style="background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 3px; font-size: 12px; padding: 4px;">
+                        <option value="100">100 (Тонкий)</option>
+                        <option value="300">300 (Лёгкий)</option>
+                        <option value="normal" selected>Нормальный</option>
+                        <option value="600">600 (Полужирный)</option>
+                        <option value="bold">Жирный</option>
+                        <option value="900">900 (Сверхжирный)</option>
+                    </select>
                 </div>
             </div>
 
