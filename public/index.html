@@ -518,6 +518,52 @@
             border-radius: 5px;
         }
 
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 32px;
+            height: 18px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: .2s;
+            border-radius: 18px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .2s;
+            border-radius: 50%;
+        }
+
+        input:checked+.toggle-slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(14px);
+        }
+
         /* Minimap */
         .minimap-container {
             width: 80px;
@@ -803,9 +849,12 @@
             <button class="btn btn-green" onclick="showNewFile()">➕ Файл</button>
             <button class="btn btn-gray" onclick="toggleSplitView()" title="Split View">◫ Разделить</button>
             <div
-                style="display: flex; align-items: center; background: #252526; padding: 0 8px; border-radius: 3px; border: 1px solid #444;">
-                <input type="checkbox" id="autoSaveCheck" style="margin-right: 5px; cursor: pointer;">
-                <label for="autoSaveCheck" style="font-size: 11px; cursor: pointer; color: #ccc;">Auto-save</label>
+                style="display: flex; align-items: center; background: #252526; padding: 0 8px; border-radius: 3px; border: 1px solid #444; height: 26px;">
+                <label class="toggle-switch" style="margin-right: 6px;">
+                    <input type="checkbox" id="autoSaveCheck">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span style="font-size: 11px; color: #ccc;">Auto-save</span>
             </div>
             <button class="btn btn-blue" id="btnCollab" onclick="toggleCollab()"
                 style="font-weight: bold; margin-left: 5px;">🌐 Совместно</button>
@@ -1045,8 +1094,12 @@
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <label style="font-size: 13px;">Отображать мини-карту:</label>
-                    <input type="checkbox" id="minimapCheck" style="cursor: pointer;">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="minimapCheck">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
+
 
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <label style="font-size: 13px;">Размер шрифта:</label>
