@@ -2685,18 +2685,25 @@
             const srcParent = window._dragSourceParent;
             const srcHandle = window._dragSourceHandle;
             if (!srcParent || !srcHandle || !destDirHandle) return;
-            if (srcParent === destDirHandle) return; // same folder, do nothing
+            if (await srcParent.isSameEntry(destDirHandle)) return; // same folder, do nothing
             try {
-                // Read file content from source
-                const file = await srcHandle.getFile();
-                const content = await file.arrayBuffer();
+                // Read content and discard file object to avoid OS file locking
+                let content;
+                {
+                    const file = await srcHandle.getFile();
+                    content = await file.arrayBuffer();
+                }
                 // Create file in destination
                 const newFile = await destDirHandle.getFileHandle(fileName, { create: true });
                 const writable = await newFile.createWritable();
                 await writable.write(content);
                 await writable.close();
-                // Remove from source
-                await srcParent.removeEntry(fileName);
+                // Remove from source safely
+                if (typeof srcHandle.remove === 'function') {
+                    await srcHandle.remove();
+                } else {
+                    await srcParent.removeEntry(fileName);
+                }
                 notify('📦 Перемещён: ' + fileName);
                 await listRender();
             } catch (e) {
@@ -2726,8 +2733,11 @@
                     e.preventDefault();
                     ui.style.outline = '';
                     const fileName = e.dataTransfer.getData('text/plain');
-                    if (fileName && window._dragSourceParent && window._dragSourceParent !== fHandle) {
-                        await moveFileToFolder(fileName, null, fHandle);
+                    if (fileName && window._dragSourceParent) {
+                        const isSame = await window._dragSourceParent.isSameEntry(fHandle);
+                        if (!isSame) {
+                            await moveFileToFolder(fileName, null, fHandle);
+                        }
                     }
                 });
             } else if (!isDir) {
