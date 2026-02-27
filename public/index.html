@@ -1253,6 +1253,7 @@
 
         let fHandle = null, fileH = null, isDir = false;
         let filesCache = [];
+        let openFolders = new Set();
         let projectMemory = {};
         let notesCache = []; // Internal array of notes metadata
         let isCreating = false;
@@ -2738,7 +2739,7 @@
             }
         }
 
-        async function renderDirTree(dirHandle, parentEl, parentHandle) {
+        async function renderDirTree(dirHandle, parentEl, parentHandle, currentPath = '') {
             const folders = [];
             const files = [];
 
@@ -2756,8 +2757,12 @@
             files.sort((a, b) => a.name.localeCompare(b.name));
 
             for (const folder of folders) {
+                const folderPath = currentPath + '/' + folder.name;
                 const folderEl = document.createElement('li');
                 folderEl.className = 'tree-folder';
+                if (openFolders.has(folderPath)) {
+                    folderEl.classList.add('open');
+                }
 
                 const header = document.createElement('div');
                 header.className = 'folder-header';
@@ -2788,6 +2793,8 @@
                     const fileName = e.dataTransfer.getData('text/plain');
                     const srcParent = e.dataTransfer.getData('application/x-parent');
                     if (fileName) {
+                        // Mark destination folder open so user sees moved file
+                        openFolders.add(folderPath);
                         await moveFileToFolder(fileName, srcParent === 'root' ? fHandle : null, folder.handle);
                     }
                 });
@@ -2803,10 +2810,12 @@
                 parentEl.appendChild(folderEl);
 
                 // Eager-load children so contents are always visible
-                await renderDirTree(folder.handle, children, dirHandle);
+                await renderDirTree(folder.handle, children, dirHandle, folderPath);
 
                 header.onclick = () => {
-                    folderEl.classList.toggle('open');
+                    const isOpen = folderEl.classList.toggle('open');
+                    if (isOpen) openFolders.add(folderPath);
+                    else openFolders.delete(folderPath);
                 };
             }
 
@@ -3024,6 +3033,9 @@
             try {
                 await contextFolderTarget.handle.getDirectoryHandle(name.trim(), { create: true });
                 notify('📁 подпапка создана: ' + name.trim());
+                // Invalidate contextTarget? nah, just add it to openFolders path!
+                // Wait, getting path from contextFolderTarget is tricky without passing it everywhere.
+                // We'll just let them click it or we can do something else.
                 listRender();
             } catch (e) {
                 alert('Ошибка: ' + e.message);
