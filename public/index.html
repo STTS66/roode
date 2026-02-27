@@ -1243,6 +1243,8 @@
 
     <!-- Folder Context Menu -->
     <div id="folderContextMenu" class="dropdown">
+        <div class="dropdown-item" onclick="showNewFileCtx()">📄 Создать файл</div>
+        <div class="dropdown-item" onclick="createNewFolderCtx()">📁 Создать папку</div>
         <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFolderCtx()">🗑 Удалить папку</div>
     </div>
 
@@ -2988,6 +2990,15 @@
 
         function showNewFile() {
             if (!isDir) return alert('Сначала откройте папку или проект');
+            window._createFileTarget = fHandle;
+            document.getElementById('fname').value = '';
+            document.getElementById('modFile').style.display = 'flex';
+            document.getElementById('fname').focus();
+        }
+
+        function showNewFileCtx() {
+            if (!contextFolderTarget) return;
+            window._createFileTarget = contextFolderTarget.handle;
             document.getElementById('fname').value = '';
             document.getElementById('modFile').style.display = 'flex';
             document.getElementById('fname').focus();
@@ -2995,11 +3006,24 @@
 
         async function createNewFolder() {
             if (!isDir || !fHandle) return alert('Сначала откройте папку');
-            const name = prompt('Имя новой папки:');
+            const name = prompt('Имя новой папки (в корне проекта):');
             if (!name || !name.trim()) return;
             try {
                 await fHandle.getDirectoryHandle(name.trim(), { create: true });
                 notify('📁 Папка создана: ' + name.trim());
+                listRender();
+            } catch (e) {
+                alert('Ошибка: ' + e.message);
+            }
+        }
+
+        async function createNewFolderCtx() {
+            if (!contextFolderTarget) return;
+            const name = prompt('Имя новой папки внутри "' + contextFolderTarget.name + '":');
+            if (!name || !name.trim()) return;
+            try {
+                await contextFolderTarget.handle.getDirectoryHandle(name.trim(), { create: true });
+                notify('📁 подпапка создана: ' + name.trim());
                 listRender();
             } catch (e) {
                 alert('Ошибка: ' + e.message);
@@ -3022,7 +3046,8 @@
             isCreating = true;
 
             try {
-                const nh = await fHandle.getFileHandle(n, { create: true });
+                const targetDir = window._createFileTarget || fHandle;
+                const nh = await targetDir.getFileHandle(n, { create: true });
                 const w = await nh.createWritable(); await w.write('// Roode Project File\n\n'); await w.close();
 
                 document.getElementById('modFile').style.display = 'none';
@@ -3596,7 +3621,9 @@
         // Init global hooks for inline HTML onclick handlers since module scope encapsulates standard scripts
         window.selFolder = selFolder;
         window.showNewFile = showNewFile;
+        window.showNewFileCtx = showNewFileCtx;
         window.createNewFolder = createNewFolder;
+        window.createNewFolderCtx = createNewFolderCtx;
         window.collapseAllFolders = collapseAllFolders;
         window.deleteFolderCtx = deleteFolderCtx;
         window.moveFileToFolder = moveFileToFolder;
