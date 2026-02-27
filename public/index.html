@@ -9,6 +9,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- Socket.IO for Real-Time Collaboration -->
     <script src="/socket.io/socket.io.js"></script>
+    <!-- Flaticon UIcons -->
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css'>
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css'>
     <style>
         :root {
             /* Default Dark Theme (VS Code Dark+ inspired) */
@@ -930,10 +933,12 @@
         <div class="controls">
             <span id="userGreeting"
                 style="font-size: 11px; margin-right: 10px; opacity: 0.8; display: none; align-items: center;"></span>
-            <button class="btn btn-gray" id="btnLogout" onclick="logout()" style="display: none; margin-right: 5px;">🚪
-                Выйти</button>
-            <button class="btn btn-blue" onclick="selFolder()">📂 Открыть папку</button>
-            <button class="btn btn-gray" onclick="toggleSplitView()" title="Split View">◫ Разделить</button>
+            <button class="btn btn-gray" id="btnLogout" onclick="logout()" style="display: none; margin-right: 5px;"><i
+                    class="fi fi-rr-sign-out-alt"></i> Выйти</button>
+            <button class="btn btn-blue" onclick="selFolder()"><i class="fi fi-rr-folder-open"></i> Открыть
+                папку</button>
+            <button class="btn btn-gray" onclick="toggleSplitView()" title="Split View"><i class="fi fi-rr-expand"></i>
+                Разделить</button>
             <div
                 style="display: flex; align-items: center; background: #252526; padding: 0 8px; border-radius: 3px; border: 1px solid #444; height: 26px;">
                 <label class="toggle-switch" style="margin-right: 6px;">
@@ -943,18 +948,23 @@
                 <span style="font-size: 11px; color: #ccc;">Auto-save</span>
             </div>
             <button class="btn btn-blue" id="btnCollab" onclick="toggleCollab()"
-                style="font-weight: bold; margin-left: 5px;">🌐 Совместно</button>
+                style="font-weight: bold; margin-left: 5px;"><i class="fi fi-rr-users"></i> Совместно</button>
             <button class="btn btn-green" id="btnSuggest" onclick="suggestChanges()"
-                style="display:none; font-weight: bold; margin-left: 5px;">🌟 Предложить</button>
-            <button class="btn btn-gray" onclick="save()" id="btnSaveMain">💾 Save</button>
+                style="display:none; font-weight: bold; margin-left: 5px;"><i class="fi fi-rr-comment-alt"></i>
+                Предложить</button>
+            <button class="btn btn-gray" onclick="save()" id="btnSaveMain"><i class="fi fi-rr-disk"></i>
+                Сохранить</button>
             <button class="btn btn-gray" style="font-size: 14px; font-weight: bold; padding: 2px 10px;"
                 onclick="toggleMenu(event)">•••</button>
-            <button class="btn btn-gray" style="font-size: 14px; padding: 2px 8px;" onclick="openSettings()">⚙️</button>
+            <button class="btn btn-gray" style="font-size: 14px; padding: 2px 8px;" onclick="openSettings()"><i
+                    class="fi fi-rr-settings"></i></button>
             <div id="mainMenu" class="dropdown">
-                <div class="dropdown-item" onclick="saveAs()">Сохранить как...</div>
-                <div class="dropdown-item" onclick="exportTxt()">Скачать .txt</div>
-                <div class="dropdown-item" onclick="exportZip()">📦 Экспорт ZIP</div>
-                <div class="dropdown-item" style="color:#ff6b6b" onclick="closeAll()">Закрыть всё</div>
+                <div class="dropdown-item" onclick="saveAs()"><i class="fi fi-rr-download"></i> Сохранить как...</div>
+                <div class="dropdown-item" onclick="exportTxt()"><i class="fi fi-rr-file-download"></i> Скачать .txt
+                </div>
+                <div class="dropdown-item" onclick="exportZip()"><i class="fi fi-rr-box"></i> Экспорт ZIP</div>
+                <div class="dropdown-item" style="color:#ff6b6b" onclick="closeAll()"><i
+                        class="fi fi-rr-cross-circle"></i> Закрыть всё</div>
             </div>
         </div>
     </header>
@@ -973,10 +983,13 @@
                     <span id="labelHeader"
                         style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">ПРОВОДНИК</span>
                     <div class="explorer-actions">
-                        <button onclick="showNewFile()" title="Новый файл">📄</button>
-                        <button onclick="createNewFolder()" title="Новая папка">📁</button>
-                        <button onclick="listRender()" title="Обновить">↻</button>
-                        <button onclick="collapseAllFolders()" title="Свернуть всё">⊟</button>
+                        <button onclick="showNewFile()" title="Новый файл"><i
+                                class="fi fi-rr-document-add"></i></button>
+                        <button onclick="createNewFolder()" title="Новая папка"><i
+                                class="fi fi-rr-folder-add"></i></button>
+                        <button onclick="listRender()" title="Обновить"><i class="fi fi-rr-refresh"></i></button>
+                        <button onclick="collapseAllFolders()" title="Свернуть всё"><i
+                                class="fi fi-rr-compress"></i></button>
                     </div>
                 </div>
                 <ul id="listUI" class="file-list"></ul>
@@ -986,8 +999,11 @@
             <div id="viewProjects" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
                 <div class="sidebar-header">
                     <span>ПРОЕКТЫ (Cloud Sync)</span>
-                    <button class="btn btn-blue" style="padding: 2px 6px; font-size: 10px;" onclick="showNewProject()">+
-                        Новый</button>
+                    <button class="btn btn-blue"
+                        style="padding: 2px 6px; font-size: 10px; display:flex; align-items:center; gap:2px;"
+                        onclick="showNewProject()">
+                        <i class="fi fi-rr-add"></i> Новый
+                    </button>
                 </div>
                 <ul id="projectsUI" class="file-list">
                     <!-- Projects injected here -->
@@ -998,8 +1014,11 @@
             <div id="viewNotes" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
                 <div class="sidebar-header">
                     <span>МОИ ЗАМЕТКИ</span>
-                    <button class="btn btn-blue" style="padding: 2px 6px; font-size: 10px;" onclick="showNewNote()">+
-                        Новая</button>
+                    <button class="btn btn-blue"
+                        style="padding: 2px 6px; font-size: 10px; display:flex; align-items:center; gap:2px;"
+                        onclick="showNewNote()">
+                        <i class="fi fi-rr-add"></i> Новая
+                    </button>
                 </div>
                 <!-- Adding a wrapper to allow scrolling multiple large note blocks -->
                 <div style="flex:1; overflow-y:auto; padding-bottom: 20px;">
@@ -1237,15 +1256,18 @@
 
     <!-- File Context Menu -->
     <div id="fileContextMenu" class="dropdown">
-        <div class="dropdown-item" onclick="renameFileCtx()">✏️ Переименовать</div>
-        <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFileCtx()">🗑 Удалить</div>
+        <div class="dropdown-item" onclick="renameFileCtx()"><i class="fi fi-rr-edit"></i> Переименовать</div>
+        <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFileCtx()"><i class="fi fi-rr-trash"></i>
+            Удалить</div>
     </div>
 
     <!-- Folder Context Menu -->
     <div id="folderContextMenu" class="dropdown">
-        <div class="dropdown-item" onclick="showNewFileCtx()">📄 Создать файл</div>
-        <div class="dropdown-item" onclick="createNewFolderCtx()">📁 Создать папку</div>
-        <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFolderCtx()">🗑 Удалить папку</div>
+        <div class="dropdown-item" onclick="showNewFileCtx()"><i class="fi fi-rr-document"></i> Создать файл</div>
+        <div class="dropdown-item" onclick="createNewFolderCtx()"><i class="fi fi-rr-folder-add"></i> Создать папку
+        </div>
+        <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFolderCtx()"><i class="fi fi-rr-trash"></i>
+            Удалить папку</div>
     </div>
 
     <script type="module">
@@ -2577,8 +2599,8 @@
             if (ext === 'md') return '<span style="color:#083fa1; font-weight:bold; font-size:14px;">M↓</span>';
             if (ext === 'prsh') return '<img src="/logo/rupl.svg" style="width:20px; height:20px; vertical-align:middle; object-fit:contain; margin-left:-2px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">';
             if (ext === 'prshx') return '<img src="/logo/ruplx.svg" style="width:20px; height:20px; vertical-align:middle; object-fit:contain; margin-left:-2px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">';
-            if (filename.match(/\.(png|jpe?g|gif|svg)$/i)) return '🖼️';
-            return '📄';
+            if (filename.match(/\.(png|jpe?g|gif|svg)$/i)) return '<i class="fi fi-rr-picture" style="color:#4caf50; font-size:14px; position:relative; top:2px;"></i>';
+            return '<i class="fi fi-rr-document" style="color:#a8a8a8; font-size:14px; position:relative; top:2px;"></i>';
         }
 
         let contextMenuTarget = null;
@@ -2777,7 +2799,7 @@
 
                 const header = document.createElement('div');
                 header.className = 'folder-header';
-                header.innerHTML = `<span class="chevron">▶</span> 📁 ${folder.name}`;
+                header.innerHTML = `<span class="chevron">▶</span> <i class="fi fi-sr-folder" style="color:#dcb67a; font-size:14px; position:relative; top:2px;"></i> ${folder.name}`;
 
                 // Right-click on folder header
                 header.oncontextmenu = (e) => {
