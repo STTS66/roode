@@ -2731,6 +2731,7 @@
                 });
                 ui.addEventListener('drop', async (e) => {
                     e.preventDefault();
+                    if (e.target.closest('.folder-header')) return; // Ignore drops handled by folder listeners
                     ui.style.outline = '';
                     const fileName = e.dataTransfer.getData('text/plain');
                     if (fileName && window._dragSourceParent) {
@@ -2792,13 +2793,16 @@
                 // Drop target: accept files dragged here
                 header.addEventListener('dragover', (e) => {
                     e.preventDefault();
+                    e.stopPropagation(); // Prevent bubbling to root
                     header.style.background = 'rgba(0,122,204,0.3)';
                 });
-                header.addEventListener('dragleave', () => {
+                header.addEventListener('dragleave', (e) => {
+                    e.stopPropagation();
                     header.style.background = '';
                 });
                 header.addEventListener('drop', async (e) => {
                     e.preventDefault();
+                    e.stopPropagation(); // CRITICAL: Stop root ui listener from catching this
                     header.style.background = '';
                     const fileName = e.dataTransfer.getData('text/plain');
                     const srcParent = e.dataTransfer.getData('application/x-parent');
