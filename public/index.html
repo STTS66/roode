@@ -3600,8 +3600,8 @@
             const cursorPos = ed.selectionStart;
             const textToCursor = ed.value.substring(0, cursorPos);
 
-            // Find current word
-            const match = textToCursor.match(/([a-zA-Z0-9_]+)$/);
+            // Find current word (supports English and Cyrillic)
+            const match = textToCursor.match(/([a-zA-Z0-9_\u0400-\u04FF]+)$/);
             if (!match) {
                 acMatches = [];
                 renderAutocomplete();
