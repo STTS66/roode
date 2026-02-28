@@ -2540,15 +2540,24 @@
             notify('Архивация...');
             const zip = new JSZip();
 
+            // Recursively add directory contents to zip
+            async function addDirToZip(dirHandle, zipFolder) {
+                for await (const [name, handle] of dirHandle.entries()) {
+                    if (name.startsWith('.')) continue;
+                    if (handle.kind === 'directory') {
+                        const subFolder = zipFolder.folder(name);
+                        await addDirToZip(handle, subFolder);
+                    } else {
+                        const file = await handle.getFile();
+                        const data = await file.arrayBuffer();
+                        zipFolder.file(name, data);
+                    }
+                }
+            }
+
             try {
                 if (isDir && fHandle) {
-                    for await (const [n, h] of fHandle.entries()) {
-                        if (h.kind === 'file') {
-                            const f = await h.getFile();
-                            const txt = await f.text();
-                            zip.file(n, txt);
-                        }
-                    }
+                    await addDirToZip(fHandle, zip);
                 } else {
                     for (let h of filesCache) {
                         const ct = projectMemory[h.name];
