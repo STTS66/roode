@@ -2638,8 +2638,13 @@
 
             if (isDir) {
                 try {
-                    const f = await h.getFile();
-                    const content = projectMemory[h.name] !== undefined ? projectMemory[h.name] : await f.text();
+                    let content;
+                    if (projectMemory[h.name] !== undefined) {
+                        content = projectMemory[h.name];
+                    } else {
+                        const f = await h.getFile();
+                        content = await f.arrayBuffer();
+                    }
 
                     const parent = h._parentHandle || fHandle;
                     const newHandle = await parent.getFileHandle(newName, { create: true });
@@ -2647,7 +2652,12 @@
                     await w.write(content);
                     await w.close();
 
-                    await parent.removeEntry(h.name);
+                    // Safely remove old handle 
+                    if (typeof h.remove === 'function') {
+                        await h.remove();
+                    } else {
+                        await parent.removeEntry(h.name);
+                    }
 
                     let tab = openTabs.find(t => t.name === h.name);
                     if (tab) {
@@ -2680,7 +2690,15 @@
 
             if (isDir) {
                 const parent = h._parentHandle || fHandle;
-                await parent.removeEntry(h.name);
+                try {
+                    if (typeof h.remove === 'function') {
+                        await h.remove();
+                    } else {
+                        await parent.removeEntry(h.name);
+                    }
+                } catch (e) {
+                    alert("Ошибка удаления файла: " + e.message);
+                }
             } else {
                 filesCache = filesCache.filter(x => x.name !== h.name);
                 delete projectMemory[h.name];
