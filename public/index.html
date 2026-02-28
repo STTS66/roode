@@ -1215,6 +1215,13 @@
                     </label>
                 </div>
 
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <label style="font-size: 13px;">Автодополнение слов:</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autocompleteCheck" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <label style="font-size: 13px;">Размер шрифта:</label>
@@ -1658,6 +1665,12 @@
         autoSaveBox.checked = localStorage.getItem('roode_autosave') === 'true';
         autoSaveBox.addEventListener('change', (e) => {
             localStorage.setItem('roode_autosave', e.target.checked);
+        });
+
+        const autocompleteBox = document.getElementById('autocompleteCheck');
+        autocompleteBox.checked = localStorage.getItem('roode_autocomplete') !== 'false';
+        autocompleteBox.addEventListener('change', (e) => {
+            localStorage.setItem('roode_autocomplete', e.target.checked);
         });
 
         const minimapBox = document.getElementById('minimapCheck');
@@ -3517,13 +3530,7 @@
         }
 
         // --- AUTOCOMPLETE LOGIC ---
-        const autocompleteWords = [
-            'function', 'const', 'let', 'var', 'return', 'async', 'await', 'import', 'export', 'from',
-            'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'continue', 'try', 'catch', 'throw', 'new', 'class',
-            'true', 'false', 'null', 'undefined', 'document', 'window', 'console.log', 'querySelector', 'getElementById',
-            'addEventListener', 'setTimeout', 'setInterval', 'fetch', 'then', 'catch', 'finally',
-            'div', 'span', 'p', 'a', 'img', 'ul', 'li', 'h1', 'h2', 'h3', 'header', 'nav', 'main', 'footer', 'script', 'style', 'link', 'meta'
-        ];
+        // Dynamically extracted from document now
 
         let acMatches = [];
         let acSelectedIndex = 0;
@@ -3584,6 +3591,12 @@
         function handleAutocompleteInput() {
             if (frWidget.style.display === 'flex') return; // Don't autocomplete while searching
 
+            if (!document.getElementById('autocompleteCheck').checked) {
+                acMatches = [];
+                renderAutocomplete();
+                return;
+            }
+
             const cursorPos = ed.selectionStart;
             const textToCursor = ed.value.substring(0, cursorPos);
 
@@ -3605,7 +3618,13 @@
             }
 
             const query = acCurrentWord.toLowerCase();
-            acMatches = autocompleteWords.filter(w => w.toLowerCase().startsWith(query)).slice(0, 8);
+
+            // Extract all words from document dynamically
+            const allWords = ed.value.match(/[a-zA-Z0-9_\u0400-\u04FF]+/g) || [];
+            // Get unique words, excluding the exact word currently being typed
+            const uniqueWords = [...new Set(allWords)].filter(w => w !== acCurrentWord);
+
+            acMatches = uniqueWords.filter(w => w.toLowerCase().startsWith(query)).slice(0, 8);
             acSelectedIndex = 0;
             renderAutocomplete();
         }
