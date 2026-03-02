@@ -1107,6 +1107,19 @@
                     style="width: 8px; height: 8px; border-radius: 50%; background-color: #f44;"></div>
                 <div id="activeProjectLabel" style="font-weight: bold; letter-spacing: 0.5px;">No Project</div>
             </div>
+            <!-- Version control -->
+            <div id="versionBar" style="display:none; align-items:center; gap:5px;">
+                <i class="fi fi-rr-tag" style="font-size:11px; opacity:0.8;"></i>
+                <input id="versionInput" value="1.0.0"
+                    style="width:60px; font-size:10px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:3px; color:white; padding:1px 5px; outline:none; text-align:center;"
+                    placeholder="1.0.0">
+                <button onclick="saveVersion()"
+                    style="font-size:10px; padding:1px 7px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.35); border-radius:3px; color:white; cursor:pointer; white-space:nowrap;"
+                    title="Сохранить версию">✓ Сохранить</button>
+                <button onclick="showVersions()"
+                    style="font-size:10px; padding:1px 7px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); border-radius:3px; color:white; cursor:pointer;"
+                    title="История версий">☰ История</button>
+            </div>
         </div>
     </footer>
 
@@ -1184,6 +1197,21 @@
                     Нет аккаунта? <span
                         style="color: var(--accent-color); text-decoration: underline;">Зарегистрироваться</span>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Versions History Modal -->
+    <div class="overlay" id="modVersions" style="display:none;">
+        <div class="modal" style="width:480px; max-height:80vh; display:flex; flex-direction:column;">
+            <h3 style="margin:0 0 12px; display:flex; align-items:center; gap:8px;">
+                <i class="fi fi-rr-time-past" style="color:var(--accent-color);"></i>
+                История версий
+            </h3>
+            <div id="versionsList" style="flex:1; overflow-y:auto; font-size:13px;"></div>
+            <div class="modal-buttons" style="margin-top:12px;">
+                <button class="btn btn-gray" style="width:100%; justify-content:center;"
+                    onclick="document.getElementById('modVersions').style.display='none'">Закрыть</button>
             </div>
         </div>
     </div>
@@ -2502,6 +2530,7 @@
             document.getElementById('activeProjectLabel').style.color = "#4caf50";
             document.getElementById('activeProjectStatus').style.backgroundColor = "#4caf50";
             document.getElementById('activeProjectStatus').style.boxShadow = "0 0 8px #4caf50";
+            document.getElementById('versionBar').style.display = 'flex';
 
             projectMemory = {}; filesCache = []; resetEd();
             listRender();
@@ -2533,6 +2562,131 @@
             a.href = URL.createObjectURL(blob);
             a.download = (fileH ? fileH.name : 'code') + '.txt';
             a.click();
+        }
+
+        // --- VERSION CONTROL ---
+
+        async function collectFilesForVersion(dirHandle, prefix = '') {
+            const result = {};
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (name.startsWith('.')) continue;
+                const path = prefix ? `${prefix}/${name}` : name;
+                if (handle.kind === 'directory') {
+                    Object.assign(result, await collectFilesForVersion(handle, path));
+                } else {
+                    const file = await handle.getFile();
+                    result[path] = await file.text();
+                }
+            }
+            return result;
+        }
+
+        async function saveVersion() {
+            if (!activeProjectId || !fHandle) return alert('Нет активного проекта');
+            const version = document.getElementById('versionInput').value.trim();
+            if (!version) return alert('Введите номер версии');
+            const label = prompt('Описание версии (не обязательно):', '') ?? '';
+
+            notify('Сохранение версии...');
+            try {
+                const files = await collectFilesForVersion(fHandle);
+                const res = await fetch(`/api/projects/${activeProjectId}/versions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ version, label, files })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const saved = await res.json();
+                notify(`✓ Версия ${saved.version} сохранена`);
+            } catch (e) {
+                console.error(e);
+                alert('Ошибка сохранения версии: ' + e.message);
+            }
+        }
+
+        async function showVersions() {
+            if (!activeProjectId) return alert('Нет активного проекта');
+            const el = document.getElementById('versionsList');
+            el.innerHTML = '<p style="opacity:0.5">Загрузка...</p>';
+            document.getElementById('modVersions').style.display = 'flex';
+            try {
+                const res = await fetch(`/api/projects/${activeProjectId}/versions`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const versions = await res.json();
+                if (versions.length === 0) {
+                    el.innerHTML = '<p style="opacity:0.5;text-align:center;">Нет сохранённых версий</p>';
+                    return;
+                }
+                el.innerHTML = versions.map(v => {
+                    const date = new Date(v.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    return `
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 8px; border-bottom:1px solid var(--border-color); gap:8px;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:bold; color:var(--accent-color);">v${v.version}</div>
+                            ${v.label ? `<div style="font-size:11px; opacity:0.7; margin-top:2px;">${v.label}</div>` : ''}
+                            <div style="font-size:11px; opacity:0.5; margin-top:2px;">${date}</div>
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <button onclick="restoreVersion(${v.id})"
+                                style="font-size:11px; padding:3px 9px; background:var(--accent-color); border:none; border-radius:3px; color:white; cursor:pointer;">
+                                ↩ Восстановить
+                            </button>
+                            <button onclick="deleteVersion(${v.id})"
+                                style="font-size:11px; padding:3px 7px; background:#c0392b; border:none; border-radius:3px; color:white; cursor:pointer;">
+                                🗑
+                            </button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                el.innerHTML = '<p style="color:#f44">Ошибка загрузки версий</p>';
+            }
+        }
+
+        async function restoreVersion(versionId) {
+            if (!confirm('Восстановить эту версию? Текущие файлы на диске будут перезаписаны.')) return;
+            notify('Восстановление версии...');
+            try {
+                const res = await fetch(`/api/projects/${activeProjectId}/versions/${versionId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+
+                // Write files back to disk
+                for (const [filePath, content] of Object.entries(data.files)) {
+                    const parts = filePath.split('/');
+                    let dir = fHandle;
+                    for (let i = 0; i < parts.length - 1; i++) {
+                        dir = await dir.getDirectoryHandle(parts[i], { create: true });
+                    }
+                    const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+                    const w = await fileHandle.createWritable();
+                    await w.write(content);
+                    await w.close();
+                }
+
+                document.getElementById('modVersions').style.display = 'none';
+                notify(`✓ Версия v${data.version} восстановлена`);
+                listRender();
+            } catch (e) {
+                console.error(e);
+                alert('Ошибка восстановления: ' + e.message);
+            }
+        }
+
+        async function deleteVersion(versionId) {
+            if (!confirm('Удалить эту версию?')) return;
+            try {
+                await fetch(`/api/projects/${activeProjectId}/versions/${versionId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                showVersions(); // Refresh list
+            } catch (e) {
+                alert('Ошибка удаления версии');
+            }
         }
 
         async function exportZip() {
@@ -2586,6 +2740,7 @@
             document.getElementById('activeProjectLabel').style.color = "var(--text-color)";
             document.getElementById('activeProjectStatus').style.backgroundColor = "#f44";
             document.getElementById('activeProjectStatus').style.boxShadow = "none";
+            document.getElementById('versionBar').style.display = 'none';
             label.textContent = "ПРОВОДНИК";
 
             // Reset both panes
@@ -3747,6 +3902,10 @@
         window.deleteFileCtx = deleteFileCtx;
         window.closeFindReplace = closeFindReplace;
         window.suggestChanges = suggestChanges;
+        window.saveVersion = saveVersion;
+        window.showVersions = showVersions;
+        window.restoreVersion = restoreVersion;
+        window.deleteVersion = deleteVersion;
 
         updateLines();
         window.loadNotes();

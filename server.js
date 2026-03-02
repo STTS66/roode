@@ -204,6 +204,83 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// --- VERSION CONTROL ROUTES ---
+
+// List all versions of a project
+app.get('/api/projects/:id/versions', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Verify ownership
+        const proj = await pool.query('SELECT id FROM projects WHERE id=$1 AND user_id=$2', [id, req.user.userId]);
+        if (proj.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+        const result = await pool.query(
+            'SELECT id, version, label, created_at FROM project_versions WHERE project_id=$1 ORDER BY created_at DESC',
+            [id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Save a new version snapshot
+app.post('/api/projects/:id/versions', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { version, label, files } = req.body;
+    if (!version || !files) return res.status(400).json({ error: 'version and files are required' });
+    try {
+        const proj = await pool.query('SELECT id FROM projects WHERE id=$1 AND user_id=$2', [id, req.user.userId]);
+        if (proj.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+        const result = await pool.query(
+            'INSERT INTO project_versions (project_id, version, label, files) VALUES ($1,$2,$3,$4) RETURNING id, version, label, created_at',
+            [id, version, label || null, JSON.stringify(files)]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Get a single version's file contents
+app.get('/api/projects/:id/versions/:vid', authenticateToken, async (req, res) => {
+    const { id, vid } = req.params;
+    try {
+        const proj = await pool.query('SELECT id FROM projects WHERE id=$1 AND user_id=$2', [id, req.user.userId]);
+        if (proj.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+        const result = await pool.query(
+            'SELECT * FROM project_versions WHERE id=$1 AND project_id=$2',
+            [vid, id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Version not found' });
+        const row = result.rows[0];
+        row.files = JSON.parse(row.files);
+        res.json(row);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Delete a version
+app.delete('/api/projects/:id/versions/:vid', authenticateToken, async (req, res) => {
+    const { id, vid } = req.params;
+    try {
+        const proj = await pool.query('SELECT id FROM projects WHERE id=$1 AND user_id=$2', [id, req.user.userId]);
+        if (proj.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+        await pool.query('DELETE FROM project_versions WHERE id=$1 AND project_id=$2', [vid, id]);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // Default route to serve the frontend
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

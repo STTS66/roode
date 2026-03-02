@@ -43,6 +43,17 @@ async function initDB() {
       // Ignore if already exists
     }
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS project_versions (
+        id         SERIAL PRIMARY KEY,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+        version    TEXT NOT NULL,
+        label      TEXT,
+        files      TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     console.log('✅ DB ready (users & projects tables exist)');
   } finally {
     client.release();
