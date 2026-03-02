@@ -2532,6 +2532,14 @@
             document.getElementById('activeProjectStatus').style.boxShadow = "0 0 8px #4caf50";
             document.getElementById('versionBar').style.display = 'flex';
 
+            // Restore this project's version tag from localStorage
+            const versionEl = document.getElementById('versionInput');
+            versionEl.value = localStorage.getItem(`roode_version_${activeProjectId}`) || '1.0.0';
+            // Save on every change
+            versionEl.oninput = () => {
+                localStorage.setItem(`roode_version_${activeProjectId}`, versionEl.value);
+            };
+
             projectMemory = {}; filesCache = []; resetEd();
             listRender();
             switchSidebar('explorer');
