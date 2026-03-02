@@ -2699,10 +2699,15 @@
                     const restoredContent = data.files[fileH.name];
                     if (restoredContent !== undefined) {
                         ed.value = restoredContent;
+                        updateLines();
+                        scheduleMinimapRender();
                     } else {
-                        // File no longer exists in the restored version
+                        // File no longer exists in the restored version — clear editor
                         resetEd();
                     }
+                } else {
+                    // No file was open — still refresh the minimap to clear it
+                    scheduleMinimapRender();
                 }
             } catch (e) {
                 console.error(e);
