@@ -2653,7 +2653,7 @@
         }
 
         async function restoreVersion(versionId) {
-            if (!confirm('Восстановить эту версию? Текущие файлы на диске будут перезаписаны.')) return;
+            if (!confirm('Восстановить эту версию?\n\nВСЕ текущие файлы проекта на диске будут удалены и заменены файлами из выбранной версии.')) return;
             notify('Восстановление версии...');
             try {
                 const res = await fetch(`/api/projects/${activeProjectId}/versions/${versionId}`, {
@@ -2662,7 +2662,19 @@
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
 
-                // Write files back to disk
+                // Step 1: Delete ALL existing files/folders in project root
+                async function clearDirectory(dirHandle) {
+                    for await (const [name] of dirHandle.entries()) {
+                        try {
+                            await dirHandle.removeEntry(name, { recursive: true });
+                        } catch (e) {
+                            console.warn('Could not remove', name, e);
+                        }
+                    }
+                }
+                await clearDirectory(fHandle);
+
+                // Step 2: Write all files from the snapshot
                 for (const [filePath, content] of Object.entries(data.files)) {
                     const parts = filePath.split('/');
                     let dir = fHandle;
@@ -2675,9 +2687,23 @@
                     await w.close();
                 }
 
+                // Step 3: Reset editor state and re-render
+                projectMemory = {};
+                filesCache = [];
                 document.getElementById('modVersions').style.display = 'none';
                 notify(`✓ Версия v${data.version} восстановлена`);
                 listRender();
+
+                // Reload active file if it still exists in the restored version
+                if (fileH) {
+                    const restoredContent = data.files[fileH.name];
+                    if (restoredContent !== undefined) {
+                        ed.value = restoredContent;
+                    } else {
+                        // File no longer exists in the restored version
+                        resetEd();
+                    }
+                }
             } catch (e) {
                 console.error(e);
                 alert('Ошибка восстановления: ' + e.message);
