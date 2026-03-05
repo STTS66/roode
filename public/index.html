@@ -963,6 +963,7 @@
             <button class="btn btn-gray" style="font-size: 14px; padding: 2px 8px;" onclick="openSettings()"><i
                     class="fi fi-rr-settings"></i></button>
             <div id="mainMenu" class="dropdown">
+                <div class="dropdown-item" onclick="openTranslator()"><i class="fi fi-rr-language"></i> Переводчик</div>
                 <div class="dropdown-item" onclick="saveAs()"><i class="fi fi-rr-download"></i> Сохранить как...</div>
                 <div class="dropdown-item" onclick="exportTxt()"><i class="fi fi-rr-file-download"></i> Скачать .txt
                 </div>
@@ -1197,6 +1198,62 @@
                     Нет аккаунта? <span
                         style="color: var(--accent-color); text-decoration: underline;">Зарегистрироваться</span>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Translator Modal -->
+    <div class="overlay" id="modTranslate" style="display:none; z-index: 1001;">
+        <div class="modal" style="width: 400px;">
+            <h3 style="display: flex; align-items: center; gap: 8px;"><i class="fi fi-rr-language"
+                    style="color:var(--accent-color);"></i> Переводчик</h3>
+            <div
+                style="font-size: 12px; color: #aaa; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">
+                Перевод текста через Google Translate. Если переводить весь проект, то сначала будет автоматически
+                сделан снимок версии для возможности возврата.
+            </div>
+
+            <label style="display:block; margin-bottom:5px; font-size:12px; color:#aaa;">С какого языка:</label>
+            <select id="tlSourceLang"
+                style="width: 100%; margin-bottom: 15px; background: #252526; color: white; padding: 6px; border: 1px solid #444; border-radius:3px; outline:none;">
+                <option value="auto">Автоопределение</option>
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+                <option value="uk">Українська</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+            </select>
+
+            <label style="display:block; margin-bottom:5px; font-size:12px; color:#aaa;">На какой язык:</label>
+            <select id="tlTargetLang"
+                style="width: 100%; margin-bottom: 15px; background: #252526; color: white; padding: 6px; border: 1px solid #444; border-radius:3px; outline:none;">
+                <option value="en">English</option>
+                <option value="ru">Русский</option>
+                <option value="uk">Українська</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+            </select>
+
+            <label style="display:block; margin-bottom:5px; font-size:12px; color:#aaa;">Что переводим:</label>
+            <select id="tlScope"
+                style="width: 100%; margin-bottom: 25px; background: #252526; color: white; padding: 6px; border: 1px solid #444; border-radius:3px; outline:none;">
+                <option value="file">Только открытый файл</option>
+                <option value="project">Весь проект (все файлы)</option>
+            </select>
+
+            <div class="modal-buttons" style="flex-direction: column; gap: 8px; margin-top: 0;">
+                <button class="btn btn-blue" id="btnRunTranslate" onclick="startTranslation()"
+                    style="justify-content: center; width: 100%;">
+                    Перевести
+                </button>
+                <button class="btn btn-gray" onclick="document.getElementById('modTranslate').style.display='none'"
+                    style="justify-content: center; width: 100%;">Закрыть</button>
+                <button class="btn btn-gray" id="btnUndoTranslation" onclick="undoTranslation()"
+                    style="justify-content: center; width: 100%; display: none; color: #ffb74d;">
+                    <i class="fi fi-rr-undo"></i> Отменить перевод (Один файл)
+                </button>
             </div>
         </div>
     </div>
@@ -2574,6 +2631,149 @@
 
         // --- VERSION CONTROL ---
 
+        // --- TRANSLATOR LOGIC ---
+        let lastTranslationBackup = null;
+
+        function openTranslator() {
+            document.getElementById('modTranslate').style.display = 'flex';
+            document.getElementById('btnUndoTranslation').style.display = lastTranslationBackup ? 'flex' : 'none';
+        }
+
+        async function doTranslateChunks(text, targetLang, sourceLang = 'auto') {
+            const chunks = [];
+            let currentChunk = '';
+            const lines = text.split('\n');
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if ((currentChunk.length + line.length) > 1000) {
+                    chunks.push(currentChunk);
+                    currentChunk = '';
+                }
+                currentChunk += line + (i === lines.length - 1 ? '' : '\n');
+            }
+            if (currentChunk) chunks.push(currentChunk);
+
+            let translatedText = '';
+            for (const chunk of chunks) {
+                if (!chunk.trim()) {
+                    translatedText += chunk;
+                    continue;
+                }
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(chunk)}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Ошибка API перевода');
+                const data = await res.json();
+                const translatedChunk = data[0].map(x => x[0]).join('');
+                translatedText += translatedChunk;
+            }
+            return translatedText;
+        }
+
+        async function startTranslation() {
+            const scope = document.getElementById('tlScope').value;
+            const src = document.getElementById('tlSourceLang').value;
+            const tgt = document.getElementById('tlTargetLang').value;
+            const btn = document.getElementById('btnRunTranslate');
+
+            if (scope === 'file') {
+                if (!fileH || !ed.value.trim()) return alert("Нет открытого файла для перевода");
+
+                // Backup for simple undo string
+                lastTranslationBackup = { content: ed.value };
+                document.getElementById('btnUndoTranslation').style.display = 'flex';
+
+                btn.textContent = "Перевод файла...";
+                btn.disabled = true;
+                notify("Ожидайте, идёт перевод...");
+                try {
+                    const trans = await doTranslateChunks(ed.value, tgt, src);
+                    ed.value = trans;
+                    updateLines();
+                    scheduleMinimapRender();
+                    ed.dispatchEvent(new Event('input')); // trigger save
+                    notify("✓ Файл успешно переведён");
+                } catch (e) {
+                    console.error(e);
+                    alert("Ошибка перевода: " + e.message);
+                }
+                btn.textContent = "Перевести";
+                btn.disabled = false;
+
+            } else if (scope === 'project') {
+                if (!activeProjectId || !fHandle) return alert("Нет активного проекта");
+
+                btn.textContent = "Бэкап...";
+                btn.disabled = true;
+
+                // Safe Snapshot
+                document.getElementById('versionInput').value = document.getElementById('versionInput').value + " [До перевода]";
+                await saveVersion();
+                notify("Снимок проекта перед переводом сохранён в Историю. Начинаем перевод...");
+
+                btn.textContent = "Перевод проекта...";
+
+                try {
+                    const filesDict = await collectFilesForVersion(fHandle);
+
+                    let translatedCount = 0;
+                    for (const [filePath, content] of Object.entries(filesDict)) {
+                        if (filePath.match(/\.(png|jpg|jpeg|gif|zip|exe|bin|pdf|mp3|mp4)$/i)) continue; // skip binaries
+                        if (!content.trim()) continue;
+
+                        try {
+                            const trans = await doTranslateChunks(content, tgt, src);
+
+                            // write back to disk
+                            const parts = filePath.split('/');
+                            let dir = fHandle;
+                            for (let i = 0; i < parts.length - 1; i++) {
+                                dir = await dir.getDirectoryHandle(parts[i], { create: true });
+                            }
+                            const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+                            const w = await fileHandle.createWritable();
+                            await w.write(trans);
+                            await w.close();
+                            translatedCount++;
+                        } catch (e) {
+                            console.warn("Skipped file due to error: " + filePath, e);
+                        }
+                    }
+
+                    if (fileH) {
+                        try {
+                            const newFile = await fileH.getFile();
+                            ed.value = await newFile.text();
+                            updateLines();
+                            scheduleMinimapRender();
+                        } catch (e) { }
+                    }
+
+                    notify(`✓ Переведено файлов: ${translatedCount}.`);
+
+                } catch (e) {
+                    alert("Ошибка: " + e.message);
+                }
+
+                btn.textContent = "Перевести";
+                btn.disabled = false;
+            }
+
+            document.getElementById('modTranslate').style.display = 'none';
+        }
+
+        function undoTranslation() {
+            if (lastTranslationBackup && fileH) {
+                ed.value = lastTranslationBackup.content;
+                lastTranslationBackup = null;
+                document.getElementById('btnUndoTranslation').style.display = 'none';
+                updateLines();
+                scheduleMinimapRender();
+                ed.dispatchEvent(new Event('input'));
+                notify("Перевод отменён, возвращён старый текст.");
+            }
+        }
+
         async function collectFilesForVersion(dirHandle, prefix = '') {
             const result = {};
             for await (const [name, handle] of dirHandle.entries()) {
@@ -3945,6 +4145,9 @@
         window.showVersions = showVersions;
         window.restoreVersion = restoreVersion;
         window.deleteVersion = deleteVersion;
+        window.openTranslator = openTranslator;
+        window.startTranslation = startTranslation;
+        window.undoTranslation = undoTranslation;
 
         updateLines();
         window.loadNotes();
