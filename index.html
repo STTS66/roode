@@ -7,8 +7,8 @@
     <title>Roode v2.5 (Projects & Sync)</title>
     <!-- JSZip for exporting projects -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <!-- Socket.IO for Real-Time Collaboration -->
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <!-- Flaticon UIcons -->
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css'>
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css'>
@@ -1377,9 +1377,14 @@
         let isCreating = false;
         let autoSaveTimer = null;
 
-        // Auth State
-        let token = localStorage.getItem('roode_token');
-        let username = localStorage.getItem('roode_username');
+        // Auth State — Supabase
+        // ⚠️ ВСТАВЬ СЮДА СВОИ КЛЮЧИ ИЗ SUPABASE DASHBOARD (Settings → API)
+        const SUPABASE_URL = 'https://zatithvozwfimbskyqos.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphdGl0aHZvendmaW1ic2t5cW9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjAzNzksImV4cCI6MjA4ODgzNjM3OX0.331n0-fcYc7VGm1z6tkjreTSCo7xCP2FrVqxpl0cgzU';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let token = null; // will be set from supabase session
+        let username = null;
         let isLoginMode = true;
 
         // Projects State
@@ -1584,7 +1589,7 @@
                 if (activePaneId === paneId) {
                     updateCursorStats();
                     if (socket && activeRoom) {
-                        socket.emit('cursor-move', { roomId: activeRoom, file: pane.fileH ? pane.fileH.name : 'shared', pos: pane.ed.selectionStart });
+                        socket.emit('cursor-move', { senderId: socket.id, username: username || 'Guest', file: pane.fileH ? pane.fileH.name : 'shared', pos: pane.ed.selectionStart });
                     }
                 }
             });
@@ -1592,7 +1597,7 @@
                 if (activePaneId === paneId) {
                     updateCursorStats();
                     if (socket && activeRoom) {
-                        socket.emit('cursor-move', { roomId: activeRoom, file: pane.fileH ? pane.fileH.name : 'shared', pos: pane.ed.selectionStart });
+                        socket.emit('cursor-move', { senderId: socket.id, username: username || 'Guest', file: pane.fileH ? pane.fileH.name : 'shared', pos: pane.ed.selectionStart });
                     }
                 }
             });
@@ -1623,21 +1628,24 @@
         const _origRenderMinimap = renderMinimap;
         function scheduleMinimapRender() { requestAnimationFrame(() => _origRenderMinimap()); }
 
-        // --- AUTH LOGIC ---
+        // --- AUTH LOGIC (Supabase) ---
 
         function saveLastProjectToServer(projectId) {
-            fetch('/api/auth/last-project', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ last_project_id: projectId })
-            }).catch(e => console.log('Failed to save last project', e));
+            // Save last project locally (no server needed)
+            if (projectId) localStorage.setItem('roode_last_project', projectId);
+            else localStorage.removeItem('roode_last_project');
         }
 
         async function checkAuth() {
-            if (!token) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                token = null;
+                username = null;
                 document.getElementById('modAuth').style.display = 'flex';
                 document.getElementById('authUsername').focus();
             } else {
+                token = session.access_token;
+                username = session.user.user_metadata?.username || session.user.email.split('@')[0];
                 document.getElementById('modAuth').style.display = 'none';
                 document.getElementById('btnLogout').style.display = 'flex';
                 document.getElementById('userGreeting').style.display = 'flex';
@@ -1650,17 +1658,9 @@
                     startCollab(sessionId, false);
                 }
 
-                // On page reload (not fresh login), fetch last_project_id from server
+                // Load last project from localStorage
                 if (!serverLastProjectId) {
-                    try {
-                        const uRes = await fetch('/api/auth/me', {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        if (uRes.ok) {
-                            const uData = await uRes.json();
-                            serverLastProjectId = uData.last_project_id;
-                        }
-                    } catch (e) { console.log(e); }
+                    serverLastProjectId = localStorage.getItem('roode_last_project');
                 }
 
                 loadProjects();
@@ -1684,41 +1684,43 @@
 
             if (!u || !p) { errBox.textContent = 'Введите логин и пароль'; errBox.style.display = 'block'; return; }
 
+            // Supabase requires email format, so we append @roode.app
+            const email = u.includes('@') ? u : `${u}@roode.app`;
+
             try {
-                const endpoint = isLoginMode ? '/api/auth/login' : '/api/auth/register';
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: u, password: p })
-                });
-
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Ошибка авторизации');
-
                 if (!isLoginMode) {
+                    // Register
+                    const { data, error } = await supabase.auth.signUp({
+                        email,
+                        password: p,
+                        options: { data: { username: u } }
+                    });
+                    if (error) throw error;
                     errBox.style.color = '#4caf50';
                     errBox.textContent = 'Успешно! Теперь войдите.';
                     errBox.style.display = 'block';
                     setTimeout(() => { toggleAuthMode(); errBox.style.display = 'none'; errBox.style.color = '#f44'; }, 1500);
                 } else {
-                    token = data.token;
-                    username = data.username;
-                    serverLastProjectId = data.last_project_id;
-                    localStorage.setItem('roode_token', token);
-                    localStorage.setItem('roode_username', username);
+                    // Login
+                    const { data, error } = await supabase.auth.signInWithPassword({
+                        email,
+                        password: p
+                    });
+                    if (error) throw error;
+                    token = data.session.access_token;
+                    username = data.user.user_metadata?.username || u;
                     checkAuth();
                 }
             } catch (e) {
                 errBox.style.color = '#f44';
-                errBox.textContent = e.message;
+                errBox.textContent = e.message || 'Ошибка авторизации';
                 errBox.style.display = 'block';
             }
         }
 
-        window.logout = function () {
+        window.logout = async function () {
             if (!confirm('Выйти из аккаунта?')) return;
-            localStorage.removeItem('roode_token');
-            localStorage.removeItem('roode_username');
+            await supabase.auth.signOut();
             location.reload();
         }
 
@@ -1859,14 +1861,14 @@
 
             // Send cursor move to socket
             if (socket && activeRoom) {
-                socket.emit('cursor-move', { roomId: activeRoom, file: fileH ? fileH.name : 'shared', pos: ed.selectionStart });
+                socket.emit('cursor-move', { senderId: socket.id, username: username || 'Guest', file: fileH ? fileH.name : 'shared', pos: ed.selectionStart });
             }
         });
 
         ed.addEventListener('click', () => {
             updateCursorStats();
             if (socket && activeRoom) {
-                socket.emit('cursor-move', { roomId: activeRoom, file: fileH ? fileH.name : 'shared', pos: ed.selectionStart });
+                socket.emit('cursor-move', { senderId: socket.id, username: username || 'Guest', file: fileH ? fileH.name : 'shared', pos: ed.selectionStart });
             }
         });
 
@@ -1933,7 +1935,6 @@
             }
             // Broadcast to the room
             socket.emit('role-update', {
-                roomId: activeRoom,
                 targetId: targetId,
                 role: newRole
             });
@@ -1967,26 +1968,82 @@
         function startCollab(roomId, hostFlag) {
             activeRoom = roomId;
             isHost = hostFlag;
-            socket = io(); // Connect to server
+            const myId = Math.random().toString(36).substring(2, 10);
 
-            socket.on('connect', () => {
-                socket.emit('join-room', activeRoom, username || 'Guest');
-                document.getElementById('btnCollab').textContent = "🔴 Online (Выйти)";
-                document.getElementById('btnCollab').style.backgroundColor = "#ff6b6b";
+            // Create Supabase Realtime Broadcast channel
+            const channel = supabase.channel(roomId);
+            socket = { id: myId, channel: channel, emit: (event, data) => channel.send({ type: 'broadcast', event, payload: data }) };
 
-                if (!isHost) {
-                    document.getElementById('btnSaveMain').style.display = 'none';
-                    // btnSuggest is hidden because Editors edit live now
-                    notify("Подключено как Гость");
-                    // Request the project files if joining
-                    socket.emit('request-project', activeRoom);
-                } else {
-                    notify("Сессия создана (Владелец)");
+            channel.on('broadcast', { event: 'code-update' }, ({ payload }) => {
+                isReceivingCode = true;
+                const start = ed.selectionStart;
+                const end = ed.selectionEnd;
+                ed.value = payload.content;
+                if (fileH && fileH.name === payload.file) {
+                    projectMemory[payload.file] = payload.content;
+                }
+                ed.setSelectionRange(start, end);
+                updateLines();
+                isReceivingCode = false;
+            });
+
+            channel.on('broadcast', { event: 'cursor-move' }, ({ payload }) => {
+                if (payload.senderId !== myId) {
+                    drawRemoteCursor(payload.senderId, payload.username, payload.pos);
                 }
             });
 
-            socket.on('request-project', (requesterId) => {
-                // If we are the host with open files, send them
+            channel.on('broadcast', { event: 'mouse-move' }, ({ payload }) => {
+                if (payload.senderId !== myId) {
+                    drawMouseNode(payload.senderId, payload.username, payload.x, payload.y);
+                }
+            });
+
+            channel.on('broadcast', { event: 'user-joined' }, ({ payload }) => {
+                if (payload.id === myId) return;
+                notify(`${payload.username} подключился`);
+                if (isHost) {
+                    collabUsers[payload.id] = { username: payload.username, role: 'editor' };
+                    renderCollabUsers();
+                    channel.send({ type: 'broadcast', event: 'collab-state', payload: { targetId: payload.id, users: collabUsers } });
+                    if (ed.value) {
+                        channel.send({ type: 'broadcast', event: 'code-update', payload: { file: fileH ? fileH.name : 'shared', content: ed.value } });
+                    }
+                }
+            });
+
+            channel.on('broadcast', { event: 'user-left' }, ({ payload }) => {
+                if (payload.id === myId) return;
+                notify(`${payload.username} отключился`);
+                removeRemoteCursor(payload.id);
+                removeMouseNode(payload.id);
+                if (collabUsers[payload.id]) {
+                    delete collabUsers[payload.id];
+                    renderCollabUsers();
+                }
+            });
+
+            channel.on('broadcast', { event: 'collab-state' }, ({ payload }) => {
+                collabUsers = payload.users;
+                const myState = collabUsers[myId];
+                ed.readOnly = myState && myState.role === 'reader';
+                renderCollabUsers();
+            });
+
+            channel.on('broadcast', { event: 'role-update' }, ({ payload }) => {
+                if (collabUsers[payload.targetId]) {
+                    collabUsers[payload.targetId].role = payload.role;
+                    if (payload.targetId === myId) {
+                        notify(`Ваша роль изменена на: ${payload.role === 'editor' ? 'Редактор' : 'Читатель'}`);
+                        ed.readOnly = payload.role === 'reader';
+                        document.getElementById('btnSuggest').style.display = 'none';
+                    }
+                    renderCollabUsers();
+                }
+            });
+
+            channel.on('broadcast', { event: 'request-project' }, ({ payload }) => {
+                if (!isHost) return;
                 if (fHandle || filesCache.length > 0) {
                     const sendData = async () => {
                         let files = [];
@@ -1997,187 +2054,100 @@
                         } else {
                             files = filesCache.map(f => f.name);
                         }
-
-                        let pName = document.getElementById('activeProjectLabel').textContent;
-                        pName = pName.replace(/[\[\]]/g, '').trim();
+                        let pName = document.getElementById('activeProjectLabel').textContent.replace(/[\[\]]/g, '').trim();
                         if (pName === 'No Project') pName = 'Совместный файл';
-
-                        socket.emit('project-data', {
-                            roomId: activeRoom,
-                            targetId: requesterId,
-                            projectName: pName,
-                            files: files
-                        });
+                        channel.send({ type: 'broadcast', event: 'project-data', payload: { projectName: pName, files } });
                     };
                     sendData();
                 }
             });
 
-            socket.on('project-data', (data) => {
-                // If we don't have our own files open, accept the remote project tree
+            channel.on('broadcast', { event: 'project-data' }, ({ payload }) => {
                 if (!fHandle && filesCache.length === 0) {
                     isDir = false;
                     label.textContent = "ОБЩИЕ ФАЙЛЫ";
-                    document.getElementById('activeProjectLabel').textContent = `[ ${data.projectName} ]`;
+                    document.getElementById('activeProjectLabel').textContent = `[ ${payload.projectName} ]`;
                     document.getElementById('activeProjectLabel').style.color = "#03a9f4";
                     document.getElementById('activeProjectStatus').style.backgroundColor = "#03a9f4";
                     document.getElementById('activeProjectStatus').style.boxShadow = "0 0 8px #03a9f4";
-
-                    filesCache = data.files.map(name => ({ name: name, isRemote: true, kind: 'file' }));
+                    filesCache = payload.files.map(name => ({ name, isRemote: true, kind: 'file' }));
                     listRender();
                     switchSidebar('explorer');
-                    notify(`Получен доступ к проекту ${data.projectName}`);
+                    notify(`Получен доступ к проекту ${payload.projectName}`);
                 }
             });
 
-            socket.on('request-file', async (data) => {
-                // If we are host, serve the file content requested by guest
-                let content = projectMemory[data.file];
-                if (content === undefined && isDir && fHandle) {
-                    try {
-                        for await (const [n, h] of fHandle.entries()) {
-                            if (n === data.file && h.kind === 'file') {
-                                const f = await h.getFile();
-                                content = await f.text();
-                                projectMemory[data.file] = content;
-                                break;
+            channel.on('broadcast', { event: 'request-file' }, ({ payload }) => {
+                if (!isHost) return;
+                let content = projectMemory[payload.file];
+                const resolve = async () => {
+                    if (content === undefined && isDir && fHandle) {
+                        try {
+                            for await (const [n, h] of fHandle.entries()) {
+                                if (n === payload.file && h.kind === 'file') {
+                                    const f = await h.getFile();
+                                    content = await f.text();
+                                    projectMemory[payload.file] = content;
+                                    break;
+                                }
                             }
-                        }
-                    } catch (e) { }
-                }
-                if (content !== undefined) {
-                    socket.emit('code-update', { roomId: activeRoom, file: data.file, content: content });
-                }
+                        } catch (e) { }
+                    }
+                    if (content !== undefined) {
+                        channel.send({ type: 'broadcast', event: 'code-update', payload: { file: payload.file, content } });
+                    }
+                };
+                resolve();
             });
 
-            socket.on('code-suggestion', (data) => {
+            channel.on('broadcast', { event: 'code-suggestion' }, ({ payload }) => {
                 if (isHost) {
-                    if (confirm(`Гость ${data.guestName} предлагает изменения в файле ${data.file}.\n\nПринять изменения?`)) {
-                        // Accept
-                        if (fileH && fileH.name === data.file) {
-                            ed.value = data.content;
+                    if (confirm(`Гость ${payload.guestName} предлагает изменения в файле ${payload.file}.\n\nПринять изменения?`)) {
+                        if (fileH && fileH.name === payload.file) {
+                            ed.value = payload.content;
                         }
-                        projectMemory[data.file] = data.content;
-
-                        // Broadcast the accepted update to everyone
-                        socket.emit('code-update', {
-                            roomId: activeRoom,
-                            file: data.file,
-                            content: data.content
-                        });
-
-                        if (fileH && fileH.name === data.file) {
+                        projectMemory[payload.file] = payload.content;
+                        channel.send({ type: 'broadcast', event: 'code-update', payload: { file: payload.file, content: payload.content } });
+                        if (fileH && fileH.name === payload.file) {
                             updateLines();
                             updateHighlighting();
                         }
-                        notify(`Изменения от ${data.guestName} приняты!`);
+                        notify(`Изменения от ${payload.guestName} приняты!`);
                     } else {
-                        // Deny
-                        notify(`Изменения от ${data.guestName} отклонены.`);
-                        // Tell guest? (Not mandatory yet)
+                        notify(`Изменения от ${payload.guestName} отклонены.`);
                     }
                 }
             });
 
-            socket.on('code-update', (data) => {
-                // Accept incoming text continuously in collab mode, even if fileH doesn't match perfectly,
-                // so the joiner immediately sees the Host's code
-                isReceivingCode = true;
-                const start = ed.selectionStart;
-                const end = ed.selectionEnd;
+            channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    document.getElementById('btnCollab').textContent = "🔴 Online (Выйти)";
+                    document.getElementById('btnCollab').style.backgroundColor = "#ff6b6b";
 
-                ed.value = data.content;
-                if (fileH && fileH.name === data.file) {
-                    projectMemory[data.file] = data.content;
-                }
+                    channel.send({ type: 'broadcast', event: 'user-joined', payload: { id: myId, username: username || 'Guest' } });
 
-                ed.setSelectionRange(start, end);
-                updateLines();
-                isReceivingCode = false;
-            });
-
-            socket.on('cursor-move', (data) => {
-                drawRemoteCursor(data.senderId, data.username, data.pos);
-            });
-
-            socket.on('user-joined', (data) => {
-                notify(`${data.username} подключился`);
-
-                // If we are Host, register them as editor and sync state
-                if (isHost) {
-                    collabUsers[data.id] = { username: data.username, role: 'editor' };
-                    renderCollabUsers();
-
-                    // Tell the new user who is here, including themselves, so they know their role
-                    socket.emit('collab-state', {
-                        targetId: data.id,
-                        users: collabUsers
-                    });
-                }
-
-                // If we are currently editing something, broadcast it to the new user so they sync up!
-                if (isHost && ed.value) {
-                    socket.emit('code-update', {
-                        roomId: activeRoom,
-                        file: fileH ? fileH.name : 'shared',
-                        content: ed.value
-                    });
-                }
-            });
-
-            socket.on('user-left', (data) => {
-                notify(`${data.username} отключился`);
-                removeRemoteCursor(data.id);
-                removeMouseNode(data.id);
-                if (collabUsers[data.id]) {
-                    delete collabUsers[data.id];
-                    renderCollabUsers();
-                }
-            });
-
-            socket.on('collab-state', (data) => {
-                // Sent from Host to Guest upon joining
-                collabUsers = data.users;
-
-                // Set initial readonly state based on assigned role
-                const myState = collabUsers[socket.id];
-                if (myState && myState.role === 'reader') {
-                    ed.readOnly = true;
-                } else {
-                    ed.readOnly = false;
-                }
-
-                renderCollabUsers();
-            });
-
-            socket.on('role-update', (data) => {
-                if (collabUsers[data.targetId]) {
-                    collabUsers[data.targetId].role = data.role;
-                    if (data.targetId === socket.id) {
-                        notify(`Ваша роль изменена на: ${data.role === 'editor' ? 'Редактор' : 'Читатель'}`);
-                        const btnSuggest = document.getElementById('btnSuggest');
-                        if (data.role === 'reader') {
-                            ed.readOnly = true;
-                            btnSuggest.style.display = 'none';
-                        } else {
-                            ed.readOnly = false;
-                            btnSuggest.style.display = 'none'; // Editors edit live now
-                        }
+                    if (!isHost) {
+                        document.getElementById('btnSaveMain').style.display = 'none';
+                        notify("Подключено как Гость");
+                        channel.send({ type: 'broadcast', event: 'request-project', payload: { requesterId: myId } });
+                    } else {
+                        notify("Сессия создана (Владелец)");
+                        collabUsers[myId] = { username: username || 'Host', role: 'editor' };
+                        renderCollabUsers();
                     }
-                    renderCollabUsers();
                 }
             });
 
-            socket.on('mouse-move', (data) => {
-                drawMouseNode(data.senderId, data.username, data.x, data.y);
+            // Override unload to notify others
+            window.addEventListener('beforeunload', () => {
+                channel.send({ type: 'broadcast', event: 'user-left', payload: { id: myId, username: username || 'Guest' } });
             });
         }
 
         window.suggestChanges = function () {
             if (socket && activeRoom && !isHost) {
-                // Check if reader
                 const myState = collabUsers[socket.id];
-                const myRole = myState ? myState.role : 'editor'; // default to editor if unknown
+                const myRole = myState ? myState.role : 'editor';
 
                 if (myRole === 'reader') {
                     notify("Отказано: у вас права Только Читатель");
@@ -2207,13 +2177,10 @@
             }
 
             if (socket && activeRoom && !isReceivingCode) {
-                const myState = collabUsers[socket.id];
-                const myRole = isHost ? 'editor' : (myState ? myState.role : 'editor'); // default to editor if not set
+                const myRole = isHost ? 'editor' : (collabUsers[socket.id]?.role || 'editor');
 
                 if (isHost || myRole === 'editor') {
-                    // Both Host and Editor Guests broadcast keystrokes directly!
                     socket.emit('code-update', {
-                        roomId: activeRoom,
                         file: fileH ? fileH.name : 'shared',
                         content: ed.value
                     });
@@ -2227,7 +2194,8 @@
             if (socket && activeRoom && Date.now() - lastMouseTime > 50) {
                 lastMouseTime = Date.now();
                 socket.emit('mouse-move', {
-                    roomId: activeRoom,
+                    senderId: socket.id,
+                    username: username || 'Guest',
                     x: e.pageX,
                     y: e.pageY
                 });
@@ -2350,15 +2318,21 @@
             return userColors[Math.abs(hash) % userColors.length];
         }
 
-        // --- API / PROJECTS LOGIC ---
+        // --- API / PROJECTS LOGIC (Supabase) ---
 
         async function loadProjects() {
             try {
-                const res = await fetch('/api/projects', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.status === 401 || res.status === 403) { window.logout(); return; }
-                projectsList = await res.json();
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) { window.logout(); return; }
+
+                const { data, error } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false });
+                if (error) throw error;
+
+                projectsList = data;
                 renderProjects();
 
                 // Auto-load last active project on startup
@@ -2366,7 +2340,7 @@
                     if (projectsList.some(p => p.id == serverLastProjectId)) {
                         await openProject(Number(serverLastProjectId), true);
                     }
-                    serverLastProjectId = null; // only use once on startup
+                    serverLastProjectId = null;
                 }
             } catch (e) {
                 console.error(e);
@@ -2383,7 +2357,6 @@
                 const li = document.createElement('li');
                 li.className = 'project-item' + (isActive ? ' active' : '');
 
-                // Add a small green dot indicator for active project in sidebar too
                 const indicator = isActive ? `<span style="color:#4caf50; font-size: 16px; margin-right: 5px;">•</span>` : `<span style="width: 14px; display:inline-block; margin-right: 5px;"></span>`;
 
                 li.innerHTML = `
@@ -2421,11 +2394,12 @@
             if (!newName) return;
 
             try {
-                await fetch(`/api/projects/${editingProjectId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ name: newName })
-                });
+                const { error } = await supabase
+                    .from('projects')
+                    .update({ name: newName })
+                    .eq('id', editingProjectId);
+                if (error) throw error;
+
                 document.getElementById('modEditProject').style.display = 'none';
                 loadProjects();
 
@@ -2444,11 +2418,11 @@
                 const dirHandle = await window.showDirectoryPicker();
                 const folderPath = dirHandle.name;
 
-                await fetch(`/api/projects/${editingProjectId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ folder_path: folderPath })
-                });
+                const { error } = await supabase
+                    .from('projects')
+                    .update({ folder_path: folderPath })
+                    .eq('id', editingProjectId);
+                if (error) throw error;
 
                 await set(`roode_handle_${editingProjectId}`, dirHandle);
 
@@ -2470,25 +2444,23 @@
             if (!name) return;
 
             try {
-                // First ask user to pick a folder to link this project to
                 const dirHandle = await window.showDirectoryPicker();
-                const folderPath = dirHandle.name; // Browser doesn't give full path for security, we save the folder name
+                const folderPath = dirHandle.name;
 
-                const res = await fetch('/api/projects', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ name, folder_path: folderPath })
-                });
-                const newProj = await res.json();
+                const { data: { user } } = await supabase.auth.getUser();
+                const { data: newProj, error } = await supabase
+                    .from('projects')
+                    .insert({ user_id: user.id, name, folder_path: folderPath })
+                    .select()
+                    .single();
+                if (error) throw error;
 
-                // Save handle to IndexedDB
                 await set(`roode_handle_${newProj.id}`, dirHandle);
 
                 document.getElementById('modProject').style.display = 'none';
                 await loadProjects();
                 notify(`Проект ${name} создан!`);
 
-                // Auto open it since we have the handle
                 fHandle = dirHandle;
                 isDir = true;
                 activeProjectId = newProj.id;
@@ -2504,11 +2476,13 @@
             if (!confirm('Удалить проект из базы? Файлы на диске останутся.')) return;
 
             try {
-                await fetch(`/api/projects/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                await del(`roode_handle_${id}`); // Delete handle from IndexedDB
+                const { error } = await supabase
+                    .from('projects')
+                    .delete()
+                    .eq('id', id);
+                if (error) throw error;
+
+                await del(`roode_handle_${id}`);
 
                 if (activeProjectId === id) {
                     activeProjectId = null;
@@ -2798,13 +2772,12 @@
             notify('Сохранение версии...');
             try {
                 const files = await collectFilesForVersion(fHandle);
-                const res = await fetch(`/api/projects/${activeProjectId}/versions`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ version, label, files })
-                });
-                if (!res.ok) throw new Error(await res.text());
-                const saved = await res.json();
+                const { data: saved, error } = await supabase
+                    .from('project_versions')
+                    .insert({ project_id: activeProjectId, version, label: label || null, files: JSON.stringify(files) })
+                    .select()
+                    .single();
+                if (error) throw error;
                 notify(`✓ Версия ${saved.version} сохранена`);
             } catch (e) {
                 console.error(e);
@@ -2818,10 +2791,13 @@
             el.innerHTML = '<p style="opacity:0.5">Загрузка...</p>';
             document.getElementById('modVersions').style.display = 'flex';
             try {
-                const res = await fetch(`/api/projects/${activeProjectId}/versions`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const versions = await res.json();
+                const { data: versions, error } = await supabase
+                    .from('project_versions')
+                    .select('id, version, label, created_at')
+                    .eq('project_id', activeProjectId)
+                    .order('created_at', { ascending: false });
+                if (error) throw error;
+
                 if (versions.length === 0) {
                     el.innerHTML = '<p style="opacity:0.5;text-align:center;">Нет сохранённых версий</p>';
                     return;
@@ -2856,11 +2832,13 @@
             if (!confirm('Восстановить эту версию?\n\nВСЕ текущие файлы проекта на диске будут удалены и заменены файлами из выбранной версии.')) return;
             notify('Восстановление версии...');
             try {
-                const res = await fetch(`/api/projects/${activeProjectId}/versions/${versionId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!res.ok) throw new Error(await res.text());
-                const data = await res.json();
+                const { data, error } = await supabase
+                    .from('project_versions')
+                    .select('*')
+                    .eq('id', versionId)
+                    .single();
+                if (error) throw error;
+                data.files = JSON.parse(data.files);
 
                 // Step 1: Delete ALL existing files/folders in project root
                 async function clearDirectory(dirHandle) {
@@ -2894,7 +2872,6 @@
                 notify(`✓ Версия v${data.version} восстановлена`);
                 listRender();
 
-                // Reload active file if it still exists in the restored version
                 if (fileH) {
                     const restoredContent = data.files[fileH.name];
                     if (restoredContent !== undefined) {
@@ -2902,11 +2879,9 @@
                         updateLines();
                         scheduleMinimapRender();
                     } else {
-                        // File no longer exists in the restored version — clear editor
                         resetEd();
                     }
                 } else {
-                    // No file was open — still refresh the minimap to clear it
                     scheduleMinimapRender();
                 }
             } catch (e) {
@@ -2918,11 +2893,12 @@
         async function deleteVersion(versionId) {
             if (!confirm('Удалить эту версию?')) return;
             try {
-                await fetch(`/api/projects/${activeProjectId}/versions/${versionId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                showVersions(); // Refresh list
+                const { error } = await supabase
+                    .from('project_versions')
+                    .delete()
+                    .eq('id', versionId);
+                if (error) throw error;
+                showVersions();
             } catch (e) {
                 alert('Ошибка удаления версии');
             }
@@ -3401,11 +3377,10 @@
 
             // Save last file to backend if inside a project
             if (activeProjectId) {
-                fetch(`/api/projects/${activeProjectId}/last-file`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ last_file: h.name })
-                }).catch(e => console.log(e));
+                supabase.from('projects')
+                    .update({ last_file: h.name })
+                    .eq('id', activeProjectId)
+                    .then(() => {}).catch(e => console.log(e));
             }
 
             if (projectMemory[h.name] !== undefined) {
@@ -3419,7 +3394,7 @@
                     if (h.isRemote) {
                         ed.value = "// Загрузка по сети...";
                         if (socket) {
-                            socket.emit('request-file', { roomId: activeRoom, file: h.name });
+                            socket.emit('request-file', { file: h.name });
                         }
                     } else {
                         ed.value = "";
