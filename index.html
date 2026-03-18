@@ -2582,7 +2582,7 @@
         async function saveAs() {
             try {
                 const options = {
-                    types: [{ description: 'RuPL File', accept: { 'text/plain': ['.PRSH', '.PRSHX'] } }],
+                    types: [{ description: 'RuPL/MD File', accept: { 'text/plain': ['.PRSH', '.PRSHX', '.md', '.markdown'] } }],
                     suggestedName: fileH ? fileH.name : 'Untitled.PRSH'
                 };
                 const newHandle = await window.showSaveFilePicker(options);
@@ -2992,7 +2992,7 @@
             if (ext === 'html') return '<span style="color:#e34c26; font-weight:bold; font-size:14px;">&lt;/&gt;</span>';
             if (ext === 'css') return '<span style="color:#563d7c; font-weight:bold; font-size:14px;">#</span>';
             if (ext === 'json') return '<span style="color:#cb3837; font-weight:bold; font-size:14px;">{}</span>';
-            if (ext === 'md') return '<span style="color:#083fa1; font-weight:bold; font-size:14px;">M↓</span>';
+            if (ext === 'md' || ext === 'markdown') return '<i class="fi fi-rr-document" style="color:#007acc; font-size:14px; position:relative; top:2px;"></i><span style="color:#007acc; font-weight:bold; font-size:10px; margin-left:-8px; position:relative; top:-2px;">M↓</span>';
             if (ext === 'prsh') return '<img src="logo/rupl.svg" style="width:20px; height:20px; vertical-align:middle; object-fit:contain; margin-left:-2px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">';
             if (ext === 'prshx') return '<img src="logo/ruplx.svg" style="width:20px; height:20px; vertical-align:middle; object-fit:contain; margin-left:-2px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">';
             if (filename.match(/\.(png|jpe?g|gif|svg)$/i)) return '<i class="fi fi-rr-picture" style="color:#4caf50; font-size:14px; position:relative; top:2px;"></i>';
@@ -3502,7 +3502,10 @@
 
             let n = document.getElementById('fname').value.trim();
             if (!n) return;
-            if (!n.match(/\./)) n += '.PRSH';
+            if (!n.match(/\./)) {
+                // Default to .md if requested, otherwise .PRSH
+                n += '.PRSH';
+            }
 
             isCreating = true;
 
