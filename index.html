@@ -978,6 +978,7 @@
         <div class="sidebar">
             <div class="sidebar-tabs">
                 <div class="sidebar-tab active" id="tabExplorer" onclick="switchSidebar('explorer')">ФАЙЛЫ</div>
+                <div class="sidebar-tab" id="tabSearch" onclick="switchSidebar('search')">ПОИСК</div>
                 <div class="sidebar-tab" id="tabProjects" onclick="switchSidebar('projects')">ПРОЕКТЫ</div>
                 <div class="sidebar-tab" id="tabNotes" onclick="switchSidebar('notes')">ЗАМЕТКИ</div>
             </div>
@@ -998,6 +999,19 @@
                     </div>
                 </div>
                 <ul id="listUI" class="file-list"></ul>
+            </div>
+
+            <!-- SEARCH VIEW -->
+            <div id="viewSearch" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="sidebar-header" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                    <span style="align-self: flex-start;">ГЛОБАЛЬНЫЙ ПОИСК</span>
+                    <input type="text" id="globalSearchInput" placeholder="Поиск (Enter)..." style="width:100%; padding:5px; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); box-sizing: border-box; font-family:var(--editor-font); outline: none; border-radius:3px;" onkeydown="if(event.key === 'Enter') performGlobalSearch()">
+                </div>
+                <div style="flex:1; overflow-y:auto; padding-bottom: 20px;">
+                    <ul id="searchResultsUI" class="file-list" style="padding: 5px;">
+                        <!-- Results injected here -->
+                    </ul>
+                </div>
             </div>
 
             <!-- PROJECTS VIEW -->
@@ -1727,15 +1741,22 @@
         // UI Switches
         function switchSidebar(view) {
             document.getElementById('tabExplorer').classList.remove('active');
+            if(document.getElementById('tabSearch')) document.getElementById('tabSearch').classList.remove('active');
             document.getElementById('tabProjects').classList.remove('active');
             document.getElementById('tabNotes').classList.remove('active');
             document.getElementById('viewExplorer').style.display = 'none';
+            if(document.getElementById('viewSearch')) document.getElementById('viewSearch').style.display = 'none';
             document.getElementById('viewProjects').style.display = 'none';
             document.getElementById('viewNotes').style.display = 'none';
 
             if (view === 'explorer') {
                 document.getElementById('tabExplorer').classList.add('active');
                 document.getElementById('viewExplorer').style.display = 'flex';
+            } else if (view === 'search') {
+                if(document.getElementById('tabSearch')) document.getElementById('tabSearch').classList.add('active');
+                if(document.getElementById('viewSearch')) document.getElementById('viewSearch').style.display = 'flex';
+                const input = document.getElementById('globalSearchInput');
+                if(input) { input.focus(); input.select(); }
             } else if (view === 'projects') {
                 document.getElementById('tabProjects').classList.add('active');
                 document.getElementById('viewProjects').style.display = 'flex';
@@ -4126,6 +4147,117 @@
         window.openTranslator = openTranslator;
         window.startTranslation = startTranslation;
         window.undoTranslation = undoTranslation;
+
+        async function performGlobalSearch() {
+            const query = document.getElementById('globalSearchInput').value.toLowerCase();
+            const resultsUI = document.getElementById('searchResultsUI');
+            if (!resultsUI) return;
+            resultsUI.innerHTML = '';
+            if (!query) return;
+
+            resultsUI.innerHTML = '<li style="padding:10px; color:#888;">Поиск...</li>';
+            const results = [];
+            
+            if (activeProjectId && fHandle) {
+                async function searchInDir(dirHandle, pathPrefix = '') {
+                    for await (const [name, handle] of dirHandle.entries()) {
+                        if (name.startsWith('.')) continue; // ignore hidden/git
+                        const fullPath = pathPrefix ? `${pathPrefix}/${name}` : name;
+                        
+                        if (handle.kind === 'directory') {
+                            await searchInDir(handle, fullPath);
+                        } else {
+                            if (name.match(/\\.(png|jpe?g|gif|svg|zip|exe|bin|pdf|mp3|mp4)$/i)) continue;
+                            try {
+                                let content = projectMemory[name]; 
+                                if (content === undefined) {
+                                    const file = await handle.getFile();
+                                    if (file.size > 2 * 1024 * 1024) continue; 
+                                    content = await file.text();
+                                }
+                                
+                                const lines = content.split('\\n');
+                                for (let i = 0; i < lines.length; i++) {
+                                    if (lines[i].toLowerCase().includes(query)) {
+                                        results.push({
+                                            handle,
+                                            name: fullPath,
+                                            line: i + 1,
+                                            content: lines[i].trim().substring(0, 100)
+                                        });
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+                await searchInDir(fHandle);
+            } else {
+                for (let h of filesCache) {
+                    let content = projectMemory[h.name] || '';
+                    const lines = content.split('\\n');
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].toLowerCase().includes(query)) {
+                            results.push({ handle: h, name: h.name, line: i + 1, content: lines[i].trim().substring(0, 100) });
+                        }
+                    }
+                }
+                for (let note of notesCache) {
+                    const lines = note.content.split('\\n');
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].toLowerCase().includes(query)) {
+                            results.push({
+                                handle: { name: "📝 " + note.title, id: note.id, isNote: true, kind: 'file' },
+                                name: "📝 " + note.title, line: i + 1, content: lines[i].trim().substring(0, 100)
+                            });
+                        }
+                    }
+                }
+            }
+
+            resultsUI.innerHTML = '';
+            if (results.length === 0) {
+                resultsUI.innerHTML = '<li style="padding:10px; color:#888;">Ничего не найдено</li>';
+                return;
+            }
+
+            results.forEach(res => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.style.flexDirection = 'column';
+                li.style.alignItems = 'flex-start';
+                li.style.borderBottom = '1px solid var(--border-color)';
+                li.style.padding = '8px 15px';
+                
+                // Highlight matches
+                const qRegex = new RegExp("(" + query.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&') + ")", "gi");
+                const highlighted = res.content.replace(qRegex, '<span style="background:rgba(255,255,0,0.3); color:var(--text-color);">$1</span>');
+
+                li.innerHTML = \`
+                    <div style="font-size:12px; font-weight:bold; color:var(--accent-color); margin-bottom:4px;">\${res.name}:\${res.line}</div>
+                    <div style="font-size:11px; color:var(--text-color); opacity:0.8; word-break:break-all;">\${highlighted}</div>
+                \`;
+                li.onclick = async () => {
+                    await load(res.handle);
+                    setTimeout(() => {
+                        const lines = ed.value.split('\\n');
+                        let caretPos = 0;
+                        for (let i = 0; i < res.line - 1; i++) {
+                            if (lines[i] !== undefined) caretPos += lines[i].length + 1;
+                        }
+                        ed.setSelectionRange(caretPos, caretPos);
+                        ed.focus();
+                        
+                        const lineHeight = parseInt(getComputedStyle(ed).lineHeight) || 20;
+                        ed.scrollTop = Math.max(0, (res.line - 1) * lineHeight - 100);
+                        updateLines();
+                        updateCursorStats();
+                    }, 50);
+                };
+                resultsUI.appendChild(li);
+            });
+        }
+        window.performGlobalSearch = performGlobalSearch;
 
         updateLines();
         window.loadNotes();
