@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
 const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
@@ -5,7 +8,16 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const http = require('http');
 const { WebSocketServer } = require('ws');
-const path = require('path');
+
+for (const envPath of [
+    path.join(__dirname, '.env'),
+    path.join(__dirname, '..', '.env')
+]) {
+    if (fs.existsSync(envPath)) {
+        dotenv.config({ path: envPath, quiet: true });
+        break;
+    }
+}
 
 // ============ CONFIG ============
 const PORT = process.env.PORT || 3000;
@@ -15,6 +27,7 @@ const DB_URL = process.env.DATABASE_URL || 'postgresql://roode:roode_pass@localh
 const pool = new Pool({ connectionString: DB_URL });
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
@@ -230,6 +243,10 @@ app.delete('/api/versions/:id', authMiddleware, async (req, res) => {
 });
 
 // ============ NOTES ROUTES ============
+
+app.get('/api/health', (_req, res) => {
+    res.json({ ok: true, service: 'roode-server' });
+});
 
 // List notes
 app.get('/api/notes', authMiddleware, async (req, res) => {

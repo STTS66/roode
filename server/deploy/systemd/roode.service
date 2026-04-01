@@ -1,0 +1,17 @@
+[Unit]
+Description=Roode Node.js server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/roode
+EnvironmentFile=/var/www/roode/.env
+ExecStart=/usr/bin/node /var/www/roode/server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
