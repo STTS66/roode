@@ -1,0 +1,4197 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roode v3.0 (Self-Hosted)</title>
+    <!-- JSZip for exporting projects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Flaticon UIcons -->
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css'>
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css'>
+    <style>
+        :root {
+            /* Default Dark Theme (VS Code Dark+ inspired) */
+            --bg-color: #1e1e1e;
+            --sidebar-color: #252526;
+            --tab-bg: #1e1e1e;
+            --tab-inactive: #2d2d2d;
+            --tab-active-bg: #1e1e1e;
+            --text-color: #d4d4d4;
+            --accent-color: #007acc;
+            --line-number-color: #858585;
+            --header-bg: #333333;
+            --border-color: #333333;
+            --hover-bg: #2a2d2e;
+            --menu-bg: #252526;
+            --menu-hover: #094771;
+            --input-bg: #3c3c3c;
+
+            /* Syntax Highlighting */
+            --token-kw: #569cd6;
+            --token-str: #ce9178;
+            --token-num: #b5cea8;
+            --token-cmt: #6a9955;
+            --token-op: #d4d4d4;
+
+            --header-height: 40px;
+            --editor-font: 'Consolas', 'Monaco', 'Courier New', monospace;
+            --editor-size: 14px;
+            --editor-line-height: 20px;
+            --editor-font-weight: normal;
+        }
+
+        body.theme-light {
+            /* Light Theme (VS Code Light+ inspired) */
+            --bg-color: #ffffff;
+            --sidebar-color: #f3f3f3;
+            --tab-bg: #ececec;
+            --tab-inactive: #e8e8e8;
+            --tab-active-bg: #ffffff;
+            --text-color: #333333;
+            --accent-color: #007acc;
+            --line-number-color: #237893;
+            --header-bg: #dddddd;
+            --border-color: #cccccc;
+            --hover-bg: #e4e6f1;
+            --menu-bg: #f3f3f3;
+            --menu-hover: #0060a0;
+            --input-bg: #ffffff;
+
+            /* Syntax Highlighting Light */
+            --token-kw: #0000ff;
+            --token-str: #a31515;
+            --token-num: #098658;
+            --token-cmt: #008000;
+            --token-op: #333333;
+        }
+
+        body.theme-hc {
+            /* High Contrast Theme */
+            --bg-color: #000000;
+            --sidebar-color: #000000;
+            --tab-bg: #000000;
+            --tab-inactive: #000000;
+            --tab-active-bg: #000000;
+            --text-color: #ffffff;
+            --accent-color: #ffcc00;
+            /* Yellow accent */
+            --line-number-color: #ffffff;
+            --header-bg: #000000;
+            --border-color: #6fc3df;
+            /* High contrast cyan borders */
+            --hover-bg: #ffffff;
+            --menu-bg: #000000;
+            --menu-hover: #ffffff;
+            --input-bg: #000000;
+
+            /* Syntax Highlighting High Contrast */
+            --token-kw: #569cd6;
+            --token-str: #ce9178;
+            --token-num: #b5cea8;
+            --token-cmt: #6a9955;
+            --token-op: #ffffff;
+        }
+
+        /* Ensure High Contrast mode borders are prominent */
+        body.theme-hc .sidebar,
+        body.theme-hc .sidebar-tabs,
+        body.theme-hc header,
+        body.theme-hc .tab,
+        body.theme-hc .gutter,
+        body.theme-hc .modal,
+        body.theme-hc .dropdown,
+        body.theme-hc .font-controls,
+        body.theme-hc .modal input {
+            border-color: var(--border-color) !important;
+            border-width: 1px !important;
+            border-style: solid !important;
+        }
+
+        body.theme-hc .tab.active {
+            border-top: 2px solid var(--accent-color) !important;
+        }
+
+        body.theme-hc .file-item:hover,
+        body.theme-hc .project-item:hover,
+        body.theme-hc .dropdown-item:hover {
+            background-color: var(--hover-bg);
+            color: #000000 !important;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-family: -apple-system, sans-serif;
+        }
+
+        /* HEADER */
+        header {
+            height: var(--header-height);
+            background: var(--header-bg);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            user-select: none;
+            z-index: 20;
+        }
+
+        .controls {
+            display: flex;
+            gap: 6px;
+            position: relative;
+        }
+
+        .logo {
+            font-weight: bold;
+            color: var(--text-color);
+            margin-right: 10px;
+            font-size: 14px;
+        }
+
+        .btn {
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            color: white;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-blue {
+            background: var(--accent-color);
+        }
+
+        .btn-blue:hover {
+            background: #0062a3;
+        }
+
+        .btn-green {
+            background: #238636;
+        }
+
+        .btn-green:hover {
+            background: #2ea043;
+        }
+
+        .btn-gray {
+            background: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .btn-gray:hover {
+            background: var(--hover-bg);
+            color: var(--text-color);
+        }
+
+        /* MENU */
+        .dropdown {
+            position: absolute;
+            top: 30px;
+            right: 0;
+            background: var(--menu-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            display: none;
+            flex-direction: column;
+            min-width: 150px;
+            z-index: 100;
+        }
+
+        .dropdown.show {
+            display: flex;
+        }
+
+        .dropdown-item {
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            color: var(--text-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: var(--menu-hover);
+            color: white;
+        }
+
+        /* WORKSPACE */
+        .workspace {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - var(--header-height) - 25px);
+        }
+
+        .sidebar {
+            width: 250px;
+            background: var(--sidebar-color);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-tabs {
+            display: flex;
+            background: var(--tab-inactive);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: #888;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .sidebar-tab.active {
+            color: var(--text-color);
+            border-bottom-color: var(--accent-color);
+            background: var(--sidebar-color);
+        }
+
+        .sidebar-header {
+            padding: 10px 15px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #aaa;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-list {
+            flex: 1;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            padding: 4px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-color);
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+
+        .file-item:hover {
+            background: var(--hover-bg);
+        }
+
+        .file-item.active {
+            background: var(--hover-bg);
+            border-left-color: var(--accent-color);
+            color: var(--text-color);
+        }
+
+        .project-item {
+            padding: 8px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-color);
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .project-item:hover {
+            background: var(--hover-bg);
+        }
+
+        .project-item.active {
+            background: var(--hover-bg);
+            border-left-color: var(--accent-color);
+            color: var(--text-color);
+        }
+
+        .project-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .project-name {
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-path {
+            font-size: 10px;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-actions {
+            display: flex;
+            gap: 5px;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .project-item:hover .project-actions {
+            opacity: 1;
+        }
+
+        .del-btn {
+            color: #666;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        .del-btn:hover {
+            color: #f44;
+            background: rgba(255, 0, 0, 0.1);
+        }
+
+        /* File Tree */
+        .tree-folder>.folder-header {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 13px;
+            color: var(--text-color);
+            border-radius: 3px;
+        }
+
+        .tree-folder>.folder-header:hover {
+            background: var(--hover-bg);
+        }
+
+        .tree-folder>.folder-children {
+            display: none;
+            padding-left: 12px;
+            border-left: 1px solid rgba(255, 255, 255, 0.06);
+            margin-left: 8px;
+        }
+
+        .tree-folder.open>.folder-children {
+            display: block;
+        }
+
+        .tree-folder>.folder-header .chevron {
+            display: inline-block;
+            width: 12px;
+            font-size: 10px;
+            text-align: center;
+            transition: transform 0.15s;
+            color: #888;
+        }
+
+        .tree-folder.open>.folder-header .chevron {
+            transform: rotate(90deg);
+        }
+
+        /* Explorer Action Icons */
+        .explorer-actions {
+            display: flex;
+            gap: 2px;
+        }
+
+        .explorer-actions button {
+            background: transparent;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 14px;
+            line-height: 1;
+            opacity: 0.7;
+            transition: opacity 0.15s, background 0.15s;
+        }
+
+        .explorer-actions button:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: var(--bg-color);
+            min-width: 0;
+        }
+
+        .split-container {
+            display: flex;
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .editor-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            position: relative;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .editor-pane:last-child {
+            border-right: none;
+        }
+
+        .tab-bar {
+            height: 35px;
+            background: var(--tab-bg);
+            display: flex;
+            align-items: center;
+        }
+
+        .tab {
+            padding: 0 15px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            background: var(--tab-inactive);
+            font-size: 13px;
+            color: var(--text-color);
+            border-top: 2px solid transparent;
+            border-right: 1px solid var(--border-color);
+            cursor: pointer;
+            gap: 8px;
+            user-select: none;
+        }
+
+        .tab:hover {
+            background: var(--hover-bg);
+        }
+
+        .tab.active {
+            background: var(--tab-active-bg);
+            border-top-color: var(--accent-color);
+            color: var(--text-color);
+        }
+
+        .tab-close {
+            font-size: 14px;
+            color: #666;
+            line-height: 1;
+        }
+
+        .tab-close:hover {
+            color: #f44;
+        }
+
+        .code-wrapper {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gutter {
+            width: 45px;
+            flex-shrink: 0;
+            background: var(--bg-color);
+            color: var(--line-number-color);
+            text-align: right;
+            border-right: 1px solid var(--border-color);
+            user-select: none;
+            overflow: hidden;
+            padding-top: 10px;
+            box-sizing: border-box;
+        }
+
+        .line-num {
+            height: var(--editor-line-height);
+            line-height: var(--editor-line-height);
+            font-family: var(--editor-font);
+            font-size: var(--editor-size);
+            padding-right: 8px;
+        }
+
+        /* Textarea overlay */
+        .rupl-editor {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 10px;
+            /* Adjusted padding to match original */
+            box-sizing: border-box;
+            border: none;
+            outline: none;
+            resize: none;
+            background: transparent;
+            color: var(--text-color);
+            /* Changed to text-color as in original */
+            caret-color: #fff;
+            /* Changed to #fff as in original */
+            font-family: var(--editor-font);
+            font-size: var(--editor-size);
+            font-weight: var(--editor-font-weight);
+            line-height: var(--editor-line-height);
+            tab-size: 4;
+            /* Added tab-size from original */
+            white-space: pre;
+            word-wrap: normal;
+            /* Added word-wrap from original */
+            overflow-wrap: normal;
+            overflow-x: scroll;
+            overflow-y: scroll;
+            width: 100%;
+            height: 100%;
+            caret-color: #fff;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 5px;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 32px;
+            height: 18px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: .2s;
+            border-radius: 18px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .2s;
+            border-radius: 50%;
+        }
+
+        input:checked+.toggle-slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(14px);
+        }
+
+        /* Minimap */
+        .minimap-container {
+            width: 80px;
+            flex-shrink: 0;
+            position: relative;
+            background: var(--bg-color);
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .minimap-container canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .minimap-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(100, 150, 255, 0.1);
+            border: 1px solid rgba(100, 150, 255, 0.25);
+            pointer-events: none;
+            box-sizing: border-box;
+            transition: top 0.05s linear;
+        }
+
+        footer {
+            height: 25px;
+            background: var(--accent-color);
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            color: white;
+            font-size: 11px;
+            justify-content: space-between;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            align-items: center;
+            justify-content: center;
+            z-index: 99;
+        }
+
+        .modal {
+            background: #252526;
+            padding: 20px;
+            width: 300px;
+            border: 1px solid #444;
+            text-align: center;
+            border-radius: 5px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal input {
+            width: 90%;
+            padding: 8px;
+            margin: 10px 0;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 3px;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        .modal input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .font-controls {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            background: #252526;
+            border-radius: 3px;
+            border: 1px solid #444;
+            padding: 0 4px;
+        }
+
+        .font-controls button {
+            background: none;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .font-controls button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .font-controls span {
+            font-size: 10px;
+            color: #888;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        /* Command Palette */
+        #cmdPalette {
+            position: fixed;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 450px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Context Menu */
+        #fileContextMenu {
+            position: fixed;
+            z-index: 10000;
+            min-width: 120px;
+            width: max-content;
+        }
+
+        #fileContextMenu .dropdown-item {
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+
+        #folderContextMenu {
+            position: fixed;
+            z-index: 10000;
+            min-width: 120px;
+            width: max-content;
+        }
+
+        #folderContextMenu .dropdown-item {
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+
+        #cmdInput {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 15px;
+            font-size: 16px;
+            outline: none;
+            font-family: inherit;
+        }
+
+        #cmdResults {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .cmd-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .cmd-item:hover,
+        .cmd-item.selected {
+            background: var(--active-bg);
+        }
+
+        /* Find & Replace */
+        #findReplace {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            padding: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            width: 320px;
+        }
+
+        .fr-row {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .fr-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .fr-input:focus {
+            border-color: #007acc;
+        }
+
+        .fr-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid transparent;
+            color: #ccc;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .fr-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .fr-msg {
+            font-size: 11px;
+            color: #888;
+            text-align: right;
+        }
+
+        /* Autocomplete */
+        #autocomplete {
+            position: absolute;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+            max-height: 150px;
+            overflow-y: auto;
+            width: 200px;
+            display: none;
+            font-family: inherit;
+        }
+
+        .ac-item {
+            padding: 5px 10px;
+            font-size: 12px;
+            color: var(--text-color);
+            cursor: pointer;
+        }
+
+        .ac-item.selected,
+        .ac-item:hover {
+            background: var(--active-bg);
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">Roode <span style="font-size:10px;opacity:0.5">2.5</span></div>
+        <div class="controls">
+            <span id="userGreeting"
+                style="font-size: 11px; margin-right: 10px; opacity: 0.8; display: none; align-items: center;"></span>
+            <button class="btn btn-gray" id="btnLogout" onclick="logout()" style="display: none; margin-right: 5px;"><i
+                    class="fi fi-rr-sign-out-alt"></i> Выйти</button>
+            <button class="btn btn-blue" onclick="selFolder()"><i class="fi fi-rr-folder-open"></i> Открыть
+                папку</button>
+            <button class="btn btn-gray" onclick="toggleSplitView()" title="Split View"><i class="fi fi-rr-expand"></i>
+                Разделить</button>
+            <div
+                style="display: flex; align-items: center; background: #252526; padding: 0 8px; border-radius: 3px; border: 1px solid #444; height: 26px;">
+                <label class="toggle-switch" style="margin-right: 6px;">
+                    <input type="checkbox" id="autoSaveCheck">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span style="font-size: 11px; color: #ccc;">Auto-save</span>
+            </div>
+            <button class="btn btn-blue" id="btnCollab" onclick="toggleCollab()"
+                style="font-weight: bold; margin-left: 5px;"><i class="fi fi-rr-users"></i> Совместно</button>
+            <button class="btn btn-green" id="btnSuggest" onclick="suggestChanges()"
+                style="display:none; font-weight: bold; margin-left: 5px;"><i class="fi fi-rr-comment-alt"></i>
+                Предложить</button>
+            <button class="btn btn-gray" onclick="save()" id="btnSaveMain"><i class="fi fi-rr-disk"></i>
+                Сохранить</button>
+            <button class="btn btn-gray" style="font-size: 14px; font-weight: bold; padding: 2px 10px;"
+                onclick="toggleMenu(event)">•••</button>
+            <button class="btn btn-gray" style="font-size: 14px; padding: 2px 8px;" onclick="openSettings()"><i
+                    class="fi fi-rr-settings"></i></button>
+            <div id="mainMenu" class="dropdown">
+                <div class="dropdown-item" onclick="openTranslator()"><i class="fi fi-rr-language"></i> Переводчик</div>
+                <div class="dropdown-item" onclick="saveAs()"><i class="fi fi-rr-download"></i> Сохранить как...</div>
+                <div class="dropdown-item" onclick="exportTxt()"><i class="fi fi-rr-file-download"></i> Скачать .txt
+                </div>
+                <div class="dropdown-item" onclick="exportZip()"><i class="fi fi-rr-box"></i> Экспорт ZIP</div>
+                <div class="dropdown-item" style="color:#ff6b6b" onclick="closeAll()"><i
+                        class="fi fi-rr-cross-circle"></i> Закрыть всё</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <div class="sidebar">
+            <div class="sidebar-tabs">
+                <div class="sidebar-tab active" id="tabExplorer" onclick="switchSidebar('explorer')">ФАЙЛЫ</div>
+                <div class="sidebar-tab" id="tabSearch" onclick="switchSidebar('search')">ПОИСК</div>
+                <div class="sidebar-tab" id="tabProjects" onclick="switchSidebar('projects')">ПРОЕКТЫ</div>
+                <div class="sidebar-tab" id="tabNotes" onclick="switchSidebar('notes')">ЗАМЕТКИ</div>
+            </div>
+
+            <!-- EXPLORER VIEW -->
+            <div id="viewExplorer" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="sidebar-header">
+                    <span id="labelHeader"
+                        style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">ПРОВОДНИК</span>
+                    <div class="explorer-actions">
+                        <button onclick="showNewFile()" title="Новый файл"><i
+                                class="fi fi-rr-add-document"></i></button>
+                        <button onclick="createNewFolder()" title="Новая папка"><i
+                                class="fi fi-rr-add-folder"></i></button>
+                        <button onclick="listRender()" title="Обновить"><i class="fi fi-rr-refresh"></i></button>
+                        <button onclick="collapseAllFolders()" title="Свернуть всё"><i
+                                class="fi fi-rr-compress"></i></button>
+                    </div>
+                </div>
+                <ul id="listUI" class="file-list"></ul>
+            </div>
+
+            <!-- SEARCH VIEW -->
+            <div id="viewSearch" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="sidebar-header" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                    <span style="align-self: flex-start;">ГЛОБАЛЬНЫЙ ПОИСК</span>
+                    <input type="text" id="globalSearchInput" placeholder="Поиск (Enter)..." style="width:100%; padding:5px; background:var(--input-bg); color:var(--text-color); border:1px solid var(--border-color); box-sizing: border-box; font-family:var(--editor-font); outline: none; border-radius:3px;" onkeydown="if(event.key === 'Enter') performGlobalSearch()">
+                </div>
+                <div style="flex:1; overflow-y:auto; padding-bottom: 20px;">
+                    <ul id="searchResultsUI" class="file-list" style="padding: 5px;"></ul>
+                </div>
+            </div>
+
+            <!-- PROJECTS VIEW -->
+            <div id="viewProjects" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="sidebar-header">
+                    <span>ПРОЕКТЫ (Cloud Sync)</span>
+                    <button class="btn btn-blue"
+                        style="padding: 2px 6px; font-size: 10px; display:flex; align-items:center; gap:2px;"
+                        onclick="showNewProject()">
+                        <i class="fi fi-rr-add" style="position: relative; top: 1px;"></i> Новый
+                    </button>
+                </div>
+                <ul id="projectsUI" class="file-list">
+                    <!-- Projects injected here -->
+                </ul>
+            </div>
+
+            <!-- NOTES VIEW -->
+            <div id="viewNotes" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="sidebar-header">
+                    <span>МОИ ЗАМЕТКИ</span>
+                    <button class="btn btn-blue"
+                        style="padding: 2px 6px; font-size: 10px; display:flex; align-items:center; gap:2px;"
+                        onclick="showNewNote()">
+                        <i class="fi fi-rr-add" style="position: relative; top: 1px;"></i> Новая
+                    </button>
+                </div>
+                <!-- Adding a wrapper to allow scrolling multiple large note blocks -->
+                <div style="flex:1; overflow-y:auto; padding-bottom: 20px;">
+                    <ul id="notesUI" class="file-list" style="padding: 0 10px;">
+                        <!-- Notes injected here -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="editor-container">
+            <div class="split-container" id="splitContainer">
+
+                <!-- PANE 1 -->
+                <div class="editor-pane" id="pane1" onclick="setActivePane(1)">
+                    <div class="tab-bar" id="tabBarContainer1">
+                        <!-- Tabs rendered here dynamically -->
+                    </div>
+                    <div class="code-wrapper">
+                        <div id="gutter1" class="gutter"></div>
+                        <div style="position: relative; flex: 1; overflow: hidden;" id="editorContainer1">
+
+                            <!-- Find & Replace Widget (Shared globally, but placed here visually or moved) -->
+                            <div id="findReplace" style="display:none;">
+                                <div class="fr-row">
+                                    <input type="text" id="frFindInput" class="fr-input" placeholder="Найти...">
+                                    <button class="fr-btn" id="frPrev" title="Предыдущее (Shift+Enter)">▲</button>
+                                    <button class="fr-btn" id="frNext" title="Следующее (Enter)">▼</button>
+                                    <button class="fr-btn" onclick="closeFindReplace()" style="color:#ff6b6b">✕</button>
+                                </div>
+                                <div class="fr-row">
+                                    <input type="text" id="frReplaceInput" class="fr-input"
+                                        placeholder="Заменить на...">
+                                    <button class="fr-btn" id="frReplaceBtn" title="Заменить (Enter)">Заменить</button>
+                                    <button class="fr-btn" id="frReplaceAllBtn">Все</button>
+                                </div>
+                                <div class="fr-msg" id="frMsg">Нет совпадений</div>
+                            </div>
+
+                            <textarea id="editor1" class="rupl-editor" spellcheck="false"
+                                placeholder="// Roode v2.5 (Projects & Cloud Sync - Node.js Backend)"></textarea>
+
+                            <!-- Autocomplete Popup -->
+                            <ul id="autocomplete"></ul>
+                        </div>
+                        <!-- Minimap -->
+                        <div id="minimapContainer1" class="minimap-container">
+                            <canvas id="minimapCanvas1"></canvas>
+                            <div id="minimapSlider1" class="minimap-slider"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANE 2 (Hidden by default) -->
+                <div class="editor-pane" id="pane2" onclick="setActivePane(2)" style="display: none;">
+                    <div class="tab-bar" id="tabBarContainer2">
+                        <!-- Tabs rendered here dynamically -->
+                    </div>
+                    <div class="code-wrapper">
+                        <div id="gutter2" class="gutter"></div>
+                        <div style="position: relative; flex: 1; overflow: hidden;" id="editorContainer2">
+                            <textarea id="editor2" class="rupl-editor" spellcheck="false"
+                                placeholder="// Pane 2"></textarea>
+                        </div>
+                        <!-- Minimap 2 -->
+                        <div id="minimapContainer2" class="minimap-container">
+                            <canvas id="minimapCanvas2"></canvas>
+                            <div id="minimapSlider2" class="minimap-slider"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div id="msg">Готов</div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span id="cursorInfo" style="opacity: 0.9;">Ln 1, Col 1 | 0 chars</span>
+            <div id="activeProjectContainer" style="display: flex; align-items: center; gap: 8px;">
+                <div id="activeProjectStatus"
+                    style="width: 8px; height: 8px; border-radius: 50%; background-color: #f44;"></div>
+                <div id="activeProjectLabel" style="font-weight: bold; letter-spacing: 0.5px;">No Project</div>
+            </div>
+            <!-- Version control -->
+            <div id="versionBar" style="display:none; align-items:center; gap:5px;">
+                <i class="fi fi-rr-tag" style="font-size:11px; opacity:0.8;"></i>
+                <input id="versionInput" value="1.0.0"
+                    style="width:60px; font-size:10px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:3px; color:white; padding:1px 5px; outline:none; text-align:center;"
+                    placeholder="1.0.0">
+                <button onclick="saveVersion()"
+                    style="font-size:10px; padding:1px 7px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.35); border-radius:3px; color:white; cursor:pointer; white-space:nowrap;"
+                    title="Сохранить версию">✓ Сохранить</button>
+                <button onclick="showVersions()"
+                    style="font-size:10px; padding:1px 7px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); border-radius:3px; color:white; cursor:pointer;"
+                    title="История версий">☰ История</button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- NEW FILE MODAL -->
+    <div class="overlay" id="modFile">
+        <div class="modal">
+            <h3>Новый файл</h3>
+            <input id="fname" placeholder="name.PRSH"><br>
+            <div class="modal-buttons">
+                <button class="btn btn-blue" onclick="createFile()">Создать</button>
+                <button class="btn btn-gray"
+                    onclick="document.getElementById('modFile').style.display='none'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW PROJECT MODAL -->
+    <div class="overlay" id="modProject">
+        <div class="modal">
+            <h3>Новый проект</h3>
+            <input id="pname" placeholder="Мой Супер Проект"><br>
+            <div style="font-size: 12px; color: #aaa; margin-bottom: 10px; text-align: left; padding: 0 5%;">
+                Нажмите "Создать", затем выберите папку на вашем ПК для этого проекта.
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-blue" onclick="createProject()">Выбрать папку & Создать</button>
+                <button class="btn btn-gray"
+                    onclick="document.getElementById('modProject').style.display='none'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT PROJECT MODAL -->
+    <div class="overlay" id="modEditProject">
+        <div class="modal">
+            <h3>Настройки проекта</h3>
+            <input id="editPname" placeholder="Новое название"><br>
+            <div style="font-size: 12px; color: #aaa; margin-bottom: 15px; text-align: left; padding: 0 5%;">
+                Измените название или выберите новую папку, если папка проекта переместилась.
+            </div>
+            <div class="modal-buttons" style="flex-direction: column; gap: 8px; margin-top: 0;">
+                <button class="btn btn-blue" style="justify-content: center;" onclick="saveEditProject()">Сохранить
+                    название</button>
+                <button class="btn btn-green" style="justify-content: center;" onclick="changeProjectFolder()">Изменить
+                    папку</button>
+                <button class="btn btn-gray" style="justify-content: center;"
+                    onclick="document.getElementById('modEditProject').style.display='none'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW NOTE OVERLAY -->
+    <div class="overlay" id="newNoteOverlay" style="display: none;">
+        <div class="modal">
+            <h3>📝 Новая Заметка</h3>
+            <input id="noteNameInput" placeholder="Название заметки (Например: Идеи для ИИ)">
+            <div class="modal-buttons">
+                <button class="btn btn-green" onclick="createNote()">Создать</button>
+                <button class="btn btn-gray"
+                    onclick="document.getElementById('newNoteOverlay').style.display='none'">Отмена</button>
+            </div>
+        </div>
+    </div>
+    <div class="overlay" id="modAuth" style="z-index: 1000; background: var(--bg-color);">
+        <div class="modal" id="authBox">
+            <h3 id="authTitle" style="margin-top:0">Вход</h3>
+            <div id="authError" style="color: #f44; font-size: 12px; margin-bottom: 10px; display: none;"></div>
+            <input id="authUsername" placeholder="Логин">
+            <input id="authPassword" type="password" placeholder="Пароль">
+            <div class="modal-buttons" style="flex-direction: column; align-items: center;">
+                <button class="btn btn-blue" id="authBtn" onclick="doAuth()"
+                    style="width: 140px; justify-content: center; font-size: 13px; padding: 8px 0;">Войти</button>
+                <div style="font-size: 12px; color: #aaa; margin-top: 15px; cursor: pointer;"
+                    onclick="toggleAuthMode()">
+                    Нет аккаунта? <span
+                        style="color: var(--accent-color); text-decoration: underline;">Зарегистрироваться</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Translator Modal -->
+    <div class="overlay" id="modTranslate" style="display:none; z-index: 1001;">
+        <div class="modal" style="width: 400px;">
+            <h3 style="display: flex; align-items: center; gap: 8px;"><i class="fi fi-rr-language"
+                    style="color:var(--accent-color);"></i> Переводчик</h3>
+            <div
+                style="font-size: 12px; color: #aaa; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">
+                Перевод текста через Google Translate. Если переводить весь проект, то сначала будет автоматически
+                сделан снимок версии для возможности возврата.
+            </div>
+
+            <label style="display:block; margin-bottom:5px; font-size:12px; color:#aaa;">С какого языка:</label>
+            <select id="tlSourceLang"
+                style="width: 100%; margin-bottom: 15px; background: #252526; color: white; padding: 6px; border: 1px solid #444; border-radius:3px; outline:none;">
+                <option value="auto">Автоопределение</option>
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+                <option value="uk">Українська</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+            </select>
+
+            <label style="display:block; margin-bottom:5px; font-size:12px; color:#aaa;">На какой язык:</label>
+            <select id="tlTargetLang"
+                style="width: 100%; margin-bottom: 15px; background: #252526; color: white; padding: 6px; border: 1px solid #444; border-radius:3px; outline:none;">
+                <option value="en">English</option>
+                <option value="ru">Русский</option>
+                <option value="uk">Українська</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+            </select>
+
+            <label style="display:block; margin-bottom:5px; font-size:12px; color:#aaa;">Что переводим:</label>
+            <select id="tlScope"
+                style="width: 100%; margin-bottom: 25px; background: #252526; color: white; padding: 6px; border: 1px solid #444; border-radius:3px; outline:none;">
+                <option value="file">Только открытый файл</option>
+                <option value="project">Весь проект (все файлы)</option>
+            </select>
+
+            <div class="modal-buttons" style="flex-direction: column; gap: 8px; margin-top: 0;">
+                <button class="btn btn-blue" id="btnRunTranslate" onclick="startTranslation()"
+                    style="justify-content: center; width: 100%;">
+                    Перевести
+                </button>
+                <button class="btn btn-gray" onclick="document.getElementById('modTranslate').style.display='none'"
+                    style="justify-content: center; width: 100%;">Закрыть</button>
+                <button class="btn btn-gray" id="btnUndoTranslation" onclick="undoTranslation()"
+                    style="justify-content: center; width: 100%; display: none; color: #ffb74d;">
+                    <i class="fi fi-rr-undo"></i> Отменить перевод (Один файл)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Versions History Modal -->
+    <div class="overlay" id="modVersions" style="display:none;">
+        <div class="modal" style="width:480px; max-height:80vh; display:flex; flex-direction:column;">
+            <h3 style="margin:0 0 12px; display:flex; align-items:center; gap:8px;">
+                <i class="fi fi-rr-time-past" style="color:var(--accent-color);"></i>
+                История версий
+            </h3>
+            <div id="versionsList" style="flex:1; overflow-y:auto; font-size:13px;"></div>
+            <div class="modal-buttons" style="margin-top:12px;">
+                <button class="btn btn-gray" style="width:100%; justify-content:center;"
+                    onclick="document.getElementById('modVersions').style.display='none'">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Overlay -->
+    <div id="settingsOverlay" class="overlay" style="display: none;">
+        <div class="modal" style="width: 400px;">
+            <h3>⚙️ Настройки</h3>
+
+            <div
+                style="margin-top: 15px; background: rgba(0,0,0,0.1); padding: 10px; border-radius: 5px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--keyword-color);">🎨 Кастомизация</h4>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <label style="font-size: 13px;">Тема оформления:</label>
+                    <select id="themeSelect" onchange="changeTheme()"
+                        style="background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 3px; font-size: 12px; padding: 4px;">
+                        <option value="dark">Тёмная</option>
+                        <option value="light">Светлая</option>
+                        <option value="hc">Контраст</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <label style="font-size: 13px;">Отображать мини-карту:</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="minimapCheck">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <label style="font-size: 13px;">Автодополнение слов:</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autocompleteCheck" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <label style="font-size: 13px;">Размер шрифта:</label>
+                    <div class="font-controls" style="margin-right: 0;">
+                        <button onclick="changeFontSize(-1)">A-</button>
+                        <span id="fontSizeLabel">14</span>
+                        <button onclick="changeFontSize(1)">A+</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label style="font-size: 13px;">Жирность шрифта:</label>
+                    <select id="fontWeightSelect" onchange="changeFontWeight()"
+                        style="background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 3px; font-size: 12px; padding: 4px;">
+                        <option value="100">100 (Тонкий)</option>
+                        <option value="300">300 (Лёгкий)</option>
+                        <option value="normal" selected>Нормальный</option>
+                        <option value="600">600 (Полужирный)</option>
+                        <option value="bold">Жирный</option>
+                        <option value="900">900 (Сверхжирный)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="collabSettings"
+                style="display: none; margin-top: 15px; background: rgba(255,107,107,0.1); padding: 10px; border-radius: 5px; border: 1px solid rgba(255,107,107,0.3);">
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: #ff6b6b;">🌐 Участники сессии</h4>
+                <div id="collabUsersList" style="font-size: 13px; max-height: 150px; overflow-y: auto;">
+                    <em style="opacity:0.5;">Нет других участников</em>
+                </div>
+            </div>
+
+            <button class="btn btn-gray" onclick="closeSettings()"
+                style="margin-top: 20px; width: 100%; padding: 8px;">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Command Palette -->
+    <div id="cmdPalette">
+        <input type="text" id="cmdInput" placeholder="Поиск файлов по имени..." autocomplete="off">
+        <ul id="cmdResults"></ul>
+    </div>
+
+    <!-- File Context Menu -->
+    <div id="fileContextMenu" class="dropdown">
+        <div class="dropdown-item" onclick="renameFileCtx()"><i class="fi fi-rr-edit"></i> Переименовать</div>
+        <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFileCtx()"><i class="fi fi-rr-trash"></i>
+            Удалить</div>
+    </div>
+
+    <!-- Folder Context Menu -->
+    <div id="folderContextMenu" class="dropdown">
+        <div class="dropdown-item" onclick="showNewFileCtx()"><i class="fi fi-rr-document"></i> Создать файл</div>
+        <div class="dropdown-item" onclick="createNewFolderCtx()"><i class="fi fi-rr-add-folder"></i> Создать папку
+        </div>
+        <div class="dropdown-item" style="color:#ff6b6b" onclick="deleteFolderCtx()"><i class="fi fi-rr-trash"></i>
+            Удалить папку</div>
+    </div>
+
+    <script type="module">
+        import { get, set, del } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
+
+        let fHandle = null, fileH = null, isDir = false;
+        let filesCache = [];
+        let openFolders = new Set();
+        let projectMemory = {};
+        let notesCache = []; // Internal array of notes metadata
+        let isCreating = false;
+        let autoSaveTimer = null;
+
+        // Auth State — Self-Hosted API
+        const API_BASE = window.location.origin;
+        let token = localStorage.getItem('roode_token') || null;
+
+        // API helper
+        async function api(method, path, body) {
+            var headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            var opts = { method: method, headers: headers };
+            if (body && method !== 'GET') opts.body = JSON.stringify(body);
+            var resp = await fetch(API_BASE + path, opts);
+            var data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || 'API Error');
+            return data;
+        }
+        let username = null;
+        let isLoginMode = true;
+
+        // Projects State
+        let projectsList = [];
+        let activeProjectId = null;
+        let editingProjectId = null;
+        let serverLastProjectId = null; // from server on login
+
+        // Tabs State
+        let openTabs = [];
+
+        // Collaboration State
+        let socket = null;
+        let activeRoom = null;
+        let remoteCursors = {}; // store cursor visual elements
+        let isReceivingCode = false; // flag to prevent infinite echo loops
+        let isHost = false; // true if creator, false if joiner
+        let collabUsers = {}; // dict mapping socket.id -> { username, role: 'reader'|'editor' }
+        let mouseNodes = {}; // dict mapping socket.id -> DOM element for Figma cursor
+        // --- SPLIT PANE STATE ---
+        const ui = document.getElementById('listUI');
+        const msg = document.getElementById('msg');
+        const label = document.getElementById('labelHeader');
+        const menu = document.getElementById('mainMenu');
+
+        let activePaneId = 1;
+
+        const panes = {
+            1: {
+                ed: document.getElementById('editor1'),
+                gut: document.getElementById('gutter1'),
+                tabBar: document.getElementById('tabBarContainer1'),
+                minimapCanvas: document.getElementById('minimapCanvas1'),
+                minimapContainer: document.getElementById('minimapContainer1'),
+                minimapSlider: document.getElementById('minimapSlider1'),
+                openTabs: [],
+                fileH: null
+            },
+            2: {
+                ed: document.getElementById('editor2'),
+                gut: document.getElementById('gutter2'),
+                tabBar: document.getElementById('tabBarContainer2'),
+                minimapCanvas: document.getElementById('minimapCanvas2'),
+                minimapContainer: document.getElementById('minimapContainer2'),
+                minimapSlider: document.getElementById('minimapSlider2'),
+                openTabs: [],
+                fileH: null
+            }
+        };
+
+        // For backwards compatibility and ease of refactoring, define getters for the active pane
+        Object.defineProperty(window, 'ed', { get: () => panes[activePaneId].ed });
+        Object.defineProperty(window, 'gut', { get: () => panes[activePaneId].gut });
+        Object.defineProperty(window, 'tabBar', { get: () => panes[activePaneId].tabBar });
+        Object.defineProperty(window, 'openTabs', { get: () => panes[activePaneId].openTabs, set: (val) => panes[activePaneId].openTabs = val });
+        Object.defineProperty(window, 'fileH', { get: () => panes[activePaneId].fileH, set: (val) => panes[activePaneId].fileH = val });
+
+        window.setActivePane = function (id) {
+            activePaneId = id;
+            document.querySelectorAll('.editor-pane').forEach(el => el.style.borderColor = 'var(--border-color)');
+            document.getElementById('pane' + id).style.borderColor = 'var(--accent-color)';
+            updateCursorStats();
+            renderTabs();
+        }
+
+        window.toggleSplitView = function () {
+            const pane2 = document.getElementById('pane2');
+            if (pane2.style.display === 'none') {
+                pane2.style.display = 'flex';
+                setActivePane(2);
+                notify("Режим Split View включен");
+                // Trigger redraw of canvas elements
+                setTimeout(() => {
+                    updateLines();
+                    scheduleMinimapRender();
+                    setActivePane(1);
+                    updateLines();
+                    scheduleMinimapRender();
+                    setActivePane(2);
+                }, 50);
+            } else {
+                pane2.style.display = 'none';
+                setActivePane(1);
+                notify("Режим Split View выключен");
+            }
+        }
+
+        // --- MINIMAP --- (Refactored to support active pane)
+        let minimapDragging = false;
+
+        function renderMinimap() {
+            const pane = panes[activePaneId];
+            const isEnabled = document.getElementById('minimapCheck').checked;
+
+            if (!isEnabled) {
+                pane.minimapContainer.style.display = 'none';
+                return;
+            } else {
+                pane.minimapContainer.style.display = 'block';
+            }
+
+            const text = pane.ed.value;
+            const lines = text.split('\n');
+            const cW = pane.minimapContainer.clientWidth;
+            const cH = pane.minimapContainer.clientHeight;
+            const dpr = window.devicePixelRatio || 1;
+            const ctx = pane.minimapCanvas.getContext('2d');
+
+            // High-res canvas for crisp text
+            pane.minimapCanvas.width = cW * dpr;
+            pane.minimapCanvas.height = cH * dpr;
+            pane.minimapCanvas.style.width = cW + 'px';
+            pane.minimapCanvas.style.height = cH + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, cW, cH);
+
+            const fontSize = 4;
+            const lineH = fontSize + 1;
+            const padLeft = 2;
+            const totalH = lines.length * lineH;
+            const scale = totalH > cH ? cH / totalH : 1;
+            const drawLineH = lineH * scale;
+
+            ctx.font = `${fontSize}px monospace`;
+            ctx.textBaseline = 'top';
+
+            const colors = {
+                default: 'rgba(204,204,204,0.8)',
+                comment: '#6a9955',
+                string: '#ce9178',
+                keyword: '#569cd6',
+                number: '#b5cea8'
+            };
+
+            for (let i = 0; i < lines.length; i++) {
+                const y = i * drawLineH;
+                if (y > cH) break;
+                const line = lines[i];
+                const trimmed = line.trimStart();
+                if (trimmed.length === 0) continue;
+                const indent = line.length - trimmed.length;
+
+                let color = colors.default;
+                if (trimmed.startsWith('//') || trimmed.startsWith('#')) color = colors.comment;
+                else if (trimmed.startsWith('"') || trimmed.startsWith("'") || trimmed.startsWith('`')) color = colors.string;
+                else if (/^(function|const|let|var|if|else|return|for|while|class|import|export)\b/.test(trimmed)) color = colors.keyword;
+                else if (/^\d/.test(trimmed)) color = colors.number;
+
+                ctx.fillStyle = color;
+                // Truncate long lines to fit the minimap width
+                const maxChars = Math.floor((cW - padLeft) / (fontSize * 0.5));
+                const displayText = trimmed.length > maxChars ? trimmed.substring(0, maxChars) : trimmed;
+                const x = padLeft + indent * (fontSize * 0.25);
+                ctx.fillText(displayText, x, y);
+            }
+            updateMinimapSlider();
+        }
+
+        function updateMinimapSlider() {
+            const pane = panes[activePaneId];
+            const cH = pane.minimapContainer.clientHeight;
+            const lines = pane.ed.value.split('\n');
+            const lineH = 5;
+            const gap = 0;
+            const totalH = lines.length * (lineH + gap);
+            const scale = totalH > cH ? cH / totalH : 1;
+
+            const edLineH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--editor-line-height'));
+            const visibleLines = Math.floor(pane.ed.clientHeight / edLineH);
+            const scrollFraction = pane.ed.scrollHeight > pane.ed.clientHeight ? pane.ed.scrollTop / (pane.ed.scrollHeight - pane.ed.clientHeight) : 0;
+            const sliderH = Math.max(20, visibleLines * (lineH + gap) * scale);
+            const maxTop = cH - sliderH;
+            const top = maxTop * scrollFraction;
+
+            pane.minimapSlider.style.height = sliderH + 'px';
+            pane.minimapSlider.style.top = top + 'px';
+        }
+
+        function bindEditorEvents(paneId) {
+            const pane = panes[paneId];
+            pane.ed.addEventListener('scroll', () => {
+                if (activePaneId === paneId) updateMinimapSlider();
+                pane.gut.scrollTop = pane.ed.scrollTop;
+            });
+            pane.ed.addEventListener('input', () => {
+                if (activePaneId === paneId) {
+                    renderMinimap();
+                    updateLines();
+                    updateCursorStats();
+                    if (!isDir && pane.fileH) projectMemory[pane.fileH.name] = pane.ed.value;
+
+                    if (autoSaveBox.checked && pane.fileH) {
+                        clearTimeout(autoSaveTimer);
+                        autoSaveTimer = setTimeout(() => {
+                            save(true);
+                        }, 1000);
+                    }
+                }
+            });
+            pane.ed.addEventListener('keydown', () => { if (activePaneId === paneId) setTimeout(updateLines, 0); });
+            pane.ed.addEventListener('keyup', () => {
+                if (activePaneId === paneId) {
+                    updateCursorStats();
+                    if (socket && activeRoom) {
+                        socket.emit('cursor-move', { senderId: socket.id, username: username || 'Guest', file: pane.fileH ? pane.fileH.name : 'shared', pos: pane.ed.selectionStart });
+                    }
+                }
+            });
+            pane.ed.addEventListener('click', () => {
+                if (activePaneId === paneId) {
+                    updateCursorStats();
+                    if (socket && activeRoom) {
+                        socket.emit('cursor-move', { senderId: socket.id, username: username || 'Guest', file: pane.fileH ? pane.fileH.name : 'shared', pos: pane.ed.selectionStart });
+                    }
+                }
+            });
+
+            pane.minimapContainer.addEventListener('mousedown', (e) => {
+                setActivePane(paneId);
+                minimapDragging = true;
+                minimapJumpTo(e, paneId);
+            });
+        }
+
+        bindEditorEvents(1);
+        bindEditorEvents(2);
+
+        window.addEventListener('mousemove', (e) => {
+            if (minimapDragging) minimapJumpTo(e, activePaneId);
+        });
+        window.addEventListener('mouseup', () => { minimapDragging = false; });
+
+        function minimapJumpTo(e, paneId) {
+            const pane = panes[paneId];
+            const rect = pane.minimapContainer.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const fraction = y / rect.height;
+            pane.ed.scrollTop = fraction * (pane.ed.scrollHeight - pane.ed.clientHeight);
+        }
+
+        const _origRenderMinimap = renderMinimap;
+        function scheduleMinimapRender() { requestAnimationFrame(() => _origRenderMinimap()); }
+
+        // --- AUTH LOGIC (Self-Hosted API) ---
+
+        function saveLastProjectToServer(projectId) {
+            if (projectId) localStorage.setItem('roode_last_project', projectId);
+            else localStorage.removeItem('roode_last_project');
+        }
+
+        async function checkAuth() {
+            if (!token) {
+                username = null;
+                document.getElementById('modAuth').style.display = 'flex';
+                document.getElementById('authUsername').focus();
+                return;
+            }
+            try {
+                var me = await api('GET', '/api/auth/me');
+                username = me.username;
+                document.getElementById('modAuth').style.display = 'none';
+                document.getElementById('btnLogout').style.display = 'flex';
+                document.getElementById('userGreeting').style.display = 'flex';
+                document.getElementById('userGreeting').textContent = 'Привет, ' + username + '!';
+
+                var urlParams = new URLSearchParams(window.location.search);
+                var sessionId = urlParams.get('session');
+                if (sessionId) {
+                    startCollab(sessionId, false);
+                }
+
+                if (!serverLastProjectId) {
+                    serverLastProjectId = localStorage.getItem('roode_last_project');
+                }
+                loadProjects();
+            } catch (e) {
+                // Token invalid
+                token = null;
+                localStorage.removeItem('roode_token');
+                document.getElementById('modAuth').style.display = 'flex';
+                document.getElementById('authUsername').focus();
+            }
+        }
+
+        window.toggleAuthMode = function () {
+            isLoginMode = !isLoginMode;
+            document.getElementById('authTitle').textContent = isLoginMode ? 'Вход' : 'Регистрация';
+            document.getElementById('authBtn').textContent = isLoginMode ? 'Войти' : 'Зарегистрироваться';
+            document.querySelector('#modAuth .modal-buttons div').innerHTML = isLoginMode ?
+                `Нет аккаунта? <span style="color: var(--accent-color); text-decoration: underline;">Зарегистрироваться</span>` :
+                `Уже есть аккаунт? <span style="color: var(--accent-color); text-decoration: underline;">Войти</span>`;
+            document.getElementById('authError').style.display = 'none';
+        }
+
+        window.doAuth = async function () {
+            var u = document.getElementById('authUsername').value.trim();
+            var p = document.getElementById('authPassword').value.trim();
+            var errBox = document.getElementById('authError');
+
+            if (!u || !p) { errBox.textContent = 'Введите логин и пароль'; errBox.style.display = 'block'; return; }
+
+            try {
+                if (!isLoginMode) {
+                    await api('POST', '/api/auth/register', { username: u, password: p });
+                    errBox.style.color = '#4caf50';
+                    errBox.textContent = 'Успешно! Теперь войдите.';
+                    errBox.style.display = 'block';
+                    setTimeout(function() { toggleAuthMode(); errBox.style.display = 'none'; errBox.style.color = '#f44'; }, 1500);
+                } else {
+                    var data = await api('POST', '/api/auth/login', { username: u, password: p });
+                    token = data.token;
+                    username = data.username;
+                    localStorage.setItem('roode_token', token);
+                    checkAuth();
+                }
+            } catch (e) {
+                errBox.style.color = '#f44';
+                errBox.textContent = e.message || 'Ошибка авторизации';
+                errBox.style.display = 'block';
+            }
+        }
+
+        window.logout = async function () {
+            if (!confirm('Выйти из аккаунта?')) return;
+            token = null;
+            localStorage.removeItem('roode_token');
+            location.reload();
+        }
+
+        // UI Switches
+        function switchSidebar(view) {
+            document.getElementById('tabExplorer').classList.remove('active');
+            document.getElementById('tabSearch').classList.remove('active');
+            document.getElementById('tabProjects').classList.remove('active');
+            document.getElementById('tabNotes').classList.remove('active');
+            document.getElementById('viewExplorer').style.display = 'none';
+            document.getElementById('viewSearch').style.display = 'none';
+            document.getElementById('viewProjects').style.display = 'none';
+            document.getElementById('viewNotes').style.display = 'none';
+
+            if (view === 'explorer') {
+                document.getElementById('tabExplorer').classList.add('active');
+                document.getElementById('viewExplorer').style.display = 'flex';
+            } else if (view === 'search') {
+                document.getElementById('tabSearch').classList.add('active');
+                document.getElementById('viewSearch').style.display = 'flex';
+                var si = document.getElementById('globalSearchInput');
+                if (si) { si.focus(); si.select(); }
+            } else if (view === 'projects') {
+                document.getElementById('tabProjects').classList.add('active');
+                document.getElementById('viewProjects').style.display = 'flex';
+                loadProjects();
+            } else if (view === 'notes') {
+                document.getElementById('tabNotes').classList.add('active');
+                document.getElementById('viewNotes').style.display = 'flex';
+                renderNotes();
+            }
+        }
+
+        const autoSaveBox = document.getElementById('autoSaveCheck');
+        autoSaveBox.checked = localStorage.getItem('roode_autosave') === 'true';
+        autoSaveBox.addEventListener('change', (e) => {
+            localStorage.setItem('roode_autosave', e.target.checked);
+        });
+
+        const autocompleteBox = document.getElementById('autocompleteCheck');
+        autocompleteBox.checked = localStorage.getItem('roode_autocomplete') !== 'false';
+        autocompleteBox.addEventListener('change', (e) => {
+            localStorage.setItem('roode_autocomplete', e.target.checked);
+        });
+
+        const minimapBox = document.getElementById('minimapCheck');
+        minimapBox.checked = localStorage.getItem('roode_show_minimap') !== 'false';
+        minimapBox.addEventListener('change', (e) => {
+            localStorage.setItem('roode_show_minimap', e.target.checked);
+            scheduleMinimapRender(); // Update 1st pane
+            // Update 2nd pane if it exists
+            const prevPane = activePaneId;
+            setActivePane(activePaneId === 1 ? 2 : 1);
+            scheduleMinimapRender();
+            setActivePane(prevPane);
+        });
+
+        // Initialize Local Features
+        // (Moved to the end of the script to prevent ReferenceError)
+
+        // Font Size Logic
+        let currentFontSize = parseInt(localStorage.getItem('roode_font_size')) || 14;
+        function applyFontSize() {
+            document.documentElement.style.setProperty('--editor-size', currentFontSize + 'px');
+            document.documentElement.style.setProperty('--editor-line-height', (currentFontSize + 6) + 'px');
+            document.getElementById('fontSizeLabel').textContent = currentFontSize;
+        }
+        window.changeFontSize = function (delta) {
+            currentFontSize += delta;
+            if (currentFontSize < 8) currentFontSize = 8;
+            if (currentFontSize > 32) currentFontSize = 32;
+            localStorage.setItem('roode_font_size', currentFontSize);
+            applyFontSize();
+            updateLines();
+        };
+        applyFontSize();
+
+        // Font Weight Logic
+        let currentFontWeight = localStorage.getItem('roode_fontWeight') || 'normal';
+        function applyFontWeight() {
+            document.documentElement.style.setProperty('--editor-font-weight', currentFontWeight);
+            const sel = document.getElementById('fontWeightSelect');
+            if (sel) sel.value = currentFontWeight;
+        }
+        window.changeFontWeight = function () {
+            currentFontWeight = document.getElementById('fontWeightSelect').value;
+            localStorage.setItem('roode_fontWeight', currentFontWeight);
+            applyFontWeight();
+        };
+        applyFontWeight();
+
+        // Theme Logic
+        let currentTheme = localStorage.getItem('roode_theme') || 'dark';
+        function applyTheme() {
+            document.body.className = '';
+            if (currentTheme !== 'dark') {
+                document.body.classList.add('theme-' + currentTheme);
+            }
+            const sel = document.getElementById('themeSelect');
+            if (sel) sel.value = currentTheme;
+        }
+        window.changeTheme = function () {
+            currentTheme = document.getElementById('themeSelect').value;
+            localStorage.setItem('roode_theme', currentTheme);
+            applyTheme();
+        };
+        applyTheme();
+
+        // Cursor Stats
+        function updateCursorStats() {
+            const val = ed.value;
+            const startPos = ed.selectionStart;
+            const lines = val.substring(0, startPos).split("\n");
+            const currentLine = lines.length;
+            const currentCol = lines[lines.length - 1].length + 1;
+            const totalChars = val.length;
+            document.getElementById('cursorInfo').textContent = `Ln ${currentLine}, Col ${currentCol} | ${totalChars} chars`;
+        }
+
+        // Numbers & Events
+        function updateLines() {
+            if (!ed.value) { gut.innerHTML = `<div class="line-num">1</div>`; return; }
+            const linesCount = ed.value.split('\n').length;
+            let html = '';
+            for (let i = 0; i < linesCount; i++) { html += `<div class="line-num">${i + 1}</div>`; }
+            gut.innerHTML = html;
+        }
+        ed.addEventListener('input', () => {
+            updateLines();
+            updateCursorStats();
+            if (!isDir && fileH) projectMemory[fileH.name] = ed.value;
+
+            if (autoSaveBox.checked && fileH) {
+                clearTimeout(autoSaveTimer);
+                autoSaveTimer = setTimeout(() => {
+                    save(true);
+                }, 1000); // 1 second debounce
+            }
+        });
+        ed.addEventListener('scroll', () => { gut.scrollTop = ed.scrollTop; });
+        ed.addEventListener('keydown', () => setTimeout(updateLines, 0));
+        ed.addEventListener('keyup', () => {
+            updateCursorStats();
+
+            // Send cursor move to socket
+            if (socket && activeRoom) {
+                socket.emit('cursor-move', { senderId: socket.id, username: username || 'Guest', file: fileH ? fileH.name : 'shared', pos: ed.selectionStart });
+            }
+        });
+
+        ed.addEventListener('click', () => {
+            updateCursorStats();
+            if (socket && activeRoom) {
+                socket.emit('cursor-move', { senderId: socket.id, username: username || 'Guest', file: fileH ? fileH.name : 'shared', pos: ed.selectionStart });
+            }
+        });
+
+        document.getElementById('fname').addEventListener('keydown', e => { if (e.key === 'Enter') createFile(); });
+        document.getElementById('pname').addEventListener('keydown', e => { if (e.key === 'Enter') createProject(); });
+
+        function toggleMenu(e) { e.stopPropagation(); menu.classList.toggle('show'); }
+        window.addEventListener('click', () => menu.classList.remove('show'));
+
+        window.openSettings = function () {
+            document.getElementById('settingsOverlay').style.display = 'flex';
+            if (activeRoom) {
+                document.getElementById('collabSettings').style.display = 'block';
+                renderCollabUsers();
+            } else {
+                document.getElementById('collabSettings').style.display = 'none';
+            }
+        }
+
+        window.closeSettings = function () {
+            document.getElementById('settingsOverlay').style.display = 'none';
+        }
+
+        window.renderCollabUsers = function () {
+            const listEl = document.getElementById('collabUsersList');
+            const keys = Object.keys(collabUsers);
+            if (keys.length === 0) {
+                listEl.innerHTML = '<em style="opacity:0.5;">Нет других участников</em>';
+                return;
+            }
+
+            let html = '';
+            keys.forEach(id => {
+                const u = collabUsers[id];
+                const color = getCursorColor(id);
+                // Host sees a select to change roles, Guest just sees text
+                let roleCtrl = '';
+                if (isHost) {
+                    roleCtrl = `<select onchange="updateUserRole('${id}', this.value)" style="background:#222; color:#ccc; border:1px solid #444; font-size:11px; padding:2px; border-radius:3px;">
+                        <option value="editor" ${u.role === 'editor' ? 'selected' : ''}>Редактор</option>
+                        <option value="reader" ${u.role === 'reader' ? 'selected' : ''}>Читатель</option>
+                    </select>`;
+                } else {
+                    roleCtrl = `<span style="font-size:11px; opacity:0.7;">${u.role === 'editor' ? 'Редактор' : 'Читатель'}</span>`;
+                }
+
+                html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; padding:4px; background:rgba(0,0,0,0.1); border-radius:3px;">
+                    <div style="display:flex; align-items:center;">
+                        <div style="width:10px; height:10px; border-radius:50%; background:${color}; margin-right:8px;"></div>
+                        <span>${u.username}</span>
+                    </div>
+                    ${roleCtrl}
+                </div>`;
+            });
+            listEl.innerHTML = html;
+        }
+
+        window.updateUserRole = function (targetId, newRole) {
+            if (!isHost || !socket || !activeRoom) return;
+            // Update locally
+            if (collabUsers[targetId]) {
+                collabUsers[targetId].role = newRole;
+            }
+            // Broadcast to the room
+            socket.emit('role-update', {
+                targetId: targetId,
+                role: newRole
+            });
+            renderCollabUsers();
+        }
+
+        // --- COLLABORATION LOGIC ---
+
+        window.toggleCollab = function () {
+            if (activeRoom) {
+                if (confirm("Выйти из совместного сеанса?")) {
+                    window.location.href = window.location.pathname; // Reload without param
+                }
+            } else {
+                // Generate a random room ID and start
+                const newRoom = 'room-' + Math.random().toString(36).substring(2, 8);
+                startCollab(newRoom, true);
+
+                // Update URL so it can be copied
+                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?session=' + newRoom;
+                window.history.pushState({ path: newUrl }, '', newUrl);
+
+                // Copy to clipboard
+                navigator.clipboard.writeText(newUrl);
+                notify("Ссылка скопирована!");
+                document.getElementById('btnCollab').textContent = "🔴 Online (Выйти)";
+                document.getElementById('btnCollab').style.backgroundColor = "#ff6b6b";
+            }
+        }
+
+        function startCollab(roomId, hostFlag) {
+            activeRoom = roomId;
+            isHost = hostFlag;
+            const myId = Math.random().toString(36).substring(2, 10);
+
+            // Create WebSocket channel for collaboration
+            var wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            var wsUrl = wsProto + '//' + location.host + '/ws';
+            var wsConn = new WebSocket(wsUrl);
+            socket = { id: myId, ws: wsConn, emit: function(event, data) { wsConn.send(JSON.stringify({ type: event, room: roomId, senderId: myId, username: username, payload: data })); } };
+
+            wsConn.onopen = function() {
+                wsConn.send(JSON.stringify({ type: 'join', room: roomId, userId: myId, username: username }));
+            };
+
+            channel.on('broadcast', { event: 'code-update' }, ({ payload }) => {
+                isReceivingCode = true;
+                const start = ed.selectionStart;
+                const end = ed.selectionEnd;
+                ed.value = payload.content;
+                if (fileH && fileH.name === payload.file) {
+                    projectMemory[payload.file] = payload.content;
+                }
+                ed.setSelectionRange(start, end);
+                updateLines();
+                isReceivingCode = false;
+            });
+
+            channel.on('broadcast', { event: 'cursor-move' }, ({ payload }) => {
+                if (payload.senderId !== myId) {
+                    drawRemoteCursor(payload.senderId, payload.username, payload.pos);
+                }
+            });
+
+            channel.on('broadcast', { event: 'mouse-move' }, ({ payload }) => {
+                if (payload.senderId !== myId) {
+                    drawMouseNode(payload.senderId, payload.username, payload.x, payload.y);
+                }
+            });
+
+            channel.on('broadcast', { event: 'user-joined' }, ({ payload }) => {
+                if (payload.id === myId) return;
+                notify(`${payload.username} подключился`);
+                if (isHost) {
+                    collabUsers[payload.id] = { username: payload.username, role: 'editor' };
+                    renderCollabUsers();
+                    channel.send({ type: 'broadcast', event: 'collab-state', payload: { targetId: payload.id, users: collabUsers } });
+                    if (ed.value) {
+                        channel.send({ type: 'broadcast', event: 'code-update', payload: { file: fileH ? fileH.name : 'shared', content: ed.value } });
+                    }
+                }
+            });
+
+            channel.on('broadcast', { event: 'user-left' }, ({ payload }) => {
+                if (payload.id === myId) return;
+                notify(`${payload.username} отключился`);
+                removeRemoteCursor(payload.id);
+                removeMouseNode(payload.id);
+                if (collabUsers[payload.id]) {
+                    delete collabUsers[payload.id];
+                    renderCollabUsers();
+                }
+            });
+
+            channel.on('broadcast', { event: 'collab-state' }, ({ payload }) => {
+                collabUsers = payload.users;
+                const myState = collabUsers[myId];
+                ed.readOnly = myState && myState.role === 'reader';
+                renderCollabUsers();
+            });
+
+            channel.on('broadcast', { event: 'role-update' }, ({ payload }) => {
+                if (collabUsers[payload.targetId]) {
+                    collabUsers[payload.targetId].role = payload.role;
+                    if (payload.targetId === myId) {
+                        notify(`Ваша роль изменена на: ${payload.role === 'editor' ? 'Редактор' : 'Читатель'}`);
+                        ed.readOnly = payload.role === 'reader';
+                        document.getElementById('btnSuggest').style.display = 'none';
+                    }
+                    renderCollabUsers();
+                }
+            });
+
+            channel.on('broadcast', { event: 'request-project' }, ({ payload }) => {
+                if (!isHost) return;
+                if (fHandle || filesCache.length > 0) {
+                    const sendData = async () => {
+                        let files = [];
+                        if (isDir && fHandle) {
+                            for await (const [n, h] of fHandle.entries()) {
+                                if (h.kind === 'file' && !n.startsWith('.')) files.push(n);
+                            }
+                        } else {
+                            files = filesCache.map(f => f.name);
+                        }
+                        let pName = document.getElementById('activeProjectLabel').textContent.replace(/[\[\]]/g, '').trim();
+                        if (pName === 'No Project') pName = 'Совместный файл';
+                        channel.send({ type: 'broadcast', event: 'project-data', payload: { projectName: pName, files } });
+                    };
+                    sendData();
+                }
+            });
+
+            channel.on('broadcast', { event: 'project-data' }, ({ payload }) => {
+                if (!fHandle && filesCache.length === 0) {
+                    isDir = false;
+                    label.textContent = "ОБЩИЕ ФАЙЛЫ";
+                    document.getElementById('activeProjectLabel').textContent = `[ ${payload.projectName} ]`;
+                    document.getElementById('activeProjectLabel').style.color = "#03a9f4";
+                    document.getElementById('activeProjectStatus').style.backgroundColor = "#03a9f4";
+                    document.getElementById('activeProjectStatus').style.boxShadow = "0 0 8px #03a9f4";
+                    filesCache = payload.files.map(name => ({ name, isRemote: true, kind: 'file' }));
+                    listRender();
+                    switchSidebar('explorer');
+                    notify(`Получен доступ к проекту ${payload.projectName}`);
+                }
+            });
+
+            channel.on('broadcast', { event: 'request-file' }, ({ payload }) => {
+                if (!isHost) return;
+                let content = projectMemory[payload.file];
+                const resolve = async () => {
+                    if (content === undefined && isDir && fHandle) {
+                        try {
+                            for await (const [n, h] of fHandle.entries()) {
+                                if (n === payload.file && h.kind === 'file') {
+                                    const f = await h.getFile();
+                                    content = await f.text();
+                                    projectMemory[payload.file] = content;
+                                    break;
+                                }
+                            }
+                        } catch (e) { }
+                    }
+                    if (content !== undefined) {
+                        channel.send({ type: 'broadcast', event: 'code-update', payload: { file: payload.file, content } });
+                    }
+                };
+                resolve();
+            });
+
+            channel.on('broadcast', { event: 'code-suggestion' }, ({ payload }) => {
+                if (isHost) {
+                    if (confirm(`Гость ${payload.guestName} предлагает изменения в файле ${payload.file}.\n\nПринять изменения?`)) {
+                        if (fileH && fileH.name === payload.file) {
+                            ed.value = payload.content;
+                        }
+                        projectMemory[payload.file] = payload.content;
+                        channel.send({ type: 'broadcast', event: 'code-update', payload: { file: payload.file, content: payload.content } });
+                        if (fileH && fileH.name === payload.file) {
+                            updateLines();
+                            updateHighlighting();
+                        }
+                        notify(`Изменения от ${payload.guestName} приняты!`);
+                    } else {
+                        notify(`Изменения от ${payload.guestName} отклонены.`);
+                    }
+                }
+            });
+
+            channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    document.getElementById('btnCollab').textContent = "🔴 Online (Выйти)";
+                    document.getElementById('btnCollab').style.backgroundColor = "#ff6b6b";
+
+                    channel.send({ type: 'broadcast', event: 'user-joined', payload: { id: myId, username: username || 'Guest' } });
+
+                    if (!isHost) {
+                        document.getElementById('btnSaveMain').style.display = 'none';
+                        notify("Подключено как Гость");
+                        channel.send({ type: 'broadcast', event: 'request-project', payload: { requesterId: myId } });
+                    } else {
+                        notify("Сессия создана (Владелец)");
+                        collabUsers[myId] = { username: username || 'Host', role: 'editor' };
+                        renderCollabUsers();
+                    }
+                }
+            });
+
+            // Override unload to notify others
+            window.addEventListener('beforeunload', () => {
+                channel.send({ type: 'broadcast', event: 'user-left', payload: { id: myId, username: username || 'Guest' } });
+            });
+        }
+
+        window.suggestChanges = function () {
+            if (socket && activeRoom && !isHost) {
+                const myState = collabUsers[socket.id];
+                const myRole = myState ? myState.role : 'editor';
+
+                if (myRole === 'reader') {
+                    notify("Отказано: у вас права Только Читатель");
+                    return;
+                }
+
+                socket.emit('code-suggestion', {
+                    roomId: activeRoom,
+                    file: fileH ? fileH.name : 'shared',
+                    content: ed.value,
+                    guestName: username || 'Guest'
+                });
+                notify("Предложение отправлено владельцу");
+            }
+        }
+
+        // We override the input event strictly for collaboration broadcast
+        const originalInput = ed.oninput;
+        ed.addEventListener('input', () => {
+            if (fileH) {
+                let currentTab = openTabs.find(t => t.name === fileH.name);
+                if (currentTab && !currentTab.isDirty) {
+                    currentTab.isDirty = true;
+                    renderTabs();
+                }
+                projectMemory[fileH.name] = ed.value;
+            }
+
+            if (socket && activeRoom && !isReceivingCode) {
+                const myRole = isHost ? 'editor' : (collabUsers[socket.id]?.role || 'editor');
+
+                if (isHost || myRole === 'editor') {
+                    socket.emit('code-update', {
+                        file: fileH ? fileH.name : 'shared',
+                        content: ed.value
+                    });
+                }
+            }
+        });
+
+        // Throttle mousemove for tracking
+        let lastMouseTime = 0;
+        window.addEventListener('mousemove', (e) => {
+            if (socket && activeRoom && Date.now() - lastMouseTime > 50) {
+                lastMouseTime = Date.now();
+                socket.emit('mouse-move', {
+                    senderId: socket.id,
+                    username: username || 'Guest',
+                    x: e.pageX,
+                    y: e.pageY
+                });
+            }
+        });
+
+        // Function to draw remote cursors
+        function drawRemoteCursor(id, username, pos) {
+            // Find coordinates of the character at `pos`
+            const textToCursor = ed.value.substring(0, pos);
+            const lines = textToCursor.split('\n');
+            const currentLine = lines.length;
+            const currentCol = lines[lines.length - 1].length;
+
+            // Calculate pixel position based on font size (approximate)
+            // Monospace font: width is roughly fontSize * 0.6
+            const fontWidth = currentFontSize * 0.6;
+            const lineHeight = currentFontSize + 6; // matching CSS
+
+            const top = (currentLine - 1) * lineHeight - ed.scrollTop + 10; // +10 for padding
+            const left = currentCol * fontWidth - ed.scrollLeft + 10;
+
+            let cursorEl = remoteCursors[id];
+            if (!cursorEl) {
+                cursorEl = document.createElement('div');
+                cursorEl.style.position = 'absolute';
+                cursorEl.style.width = '2px';
+                cursorEl.style.height = `${currentFontSize + 4}px`;
+                cursorEl.style.backgroundColor = getCursorColor(id);
+                cursorEl.style.pointerEvents = 'none';
+                cursorEl.style.zIndex = '10';
+                cursorEl.style.transform = 'translateY(2px)';
+
+                const label = document.createElement('div');
+                label.textContent = username;
+                label.style.position = 'absolute';
+                label.style.top = `-${currentFontSize + 6}px`;
+                label.style.left = '0'; // align flush with the left border
+                label.style.backgroundColor = cursorEl.style.backgroundColor;
+                label.style.color = '#fff';
+                label.style.fontFamily = 'sans-serif'; // Clean font
+                label.style.fontSize = '12px';
+                label.style.fontWeight = 'bold';
+                label.style.padding = '2px 6px';
+                label.style.borderRadius = '4px 4px 4px 0'; // Top-L, Top-R, Bottom-R, Bottom-L
+                label.style.whiteSpace = 'nowrap';
+                label.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+
+                cursorEl.appendChild(label);
+                // Append to code-wrapper (assuming it's relative container for the textareas)
+                document.querySelector('.code-wrapper > div:last-child').appendChild(cursorEl);
+                remoteCursors[id] = cursorEl;
+            }
+
+            // Ensure bounds
+            if (top >= 0 && left >= 0) {
+                cursorEl.style.display = 'block';
+                cursorEl.style.top = `${top}px`;
+                cursorEl.style.left = `${left}px`;
+            } else {
+                cursorEl.style.display = 'none';
+            }
+        }
+
+        function removeRemoteCursor(id) {
+            if (remoteCursors[id]) {
+                remoteCursors[id].remove();
+                delete remoteCursors[id];
+            }
+        }
+
+        function drawMouseNode(id, username, x, y) {
+            let cursorEl = mouseNodes[id];
+            if (!cursorEl) {
+                cursorEl = document.createElement('div');
+                cursorEl.style.position = 'absolute';
+                cursorEl.style.pointerEvents = 'none'; // Don't block clicks!
+                cursorEl.style.zIndex = '99999'; // Stay on top
+
+                // SVG Arrow pointing visually like a cursor
+                const svg = document.createElement('div');
+                svg.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5.808 14.853L8.358 9.531L13.9 11.239L1 1Z" fill="' + getCursorColor(id) + '" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+
+                const label = document.createElement('div');
+                label.textContent = username;
+                label.style.position = 'absolute';
+                label.style.left = '12px';
+                label.style.top = '12px';
+                label.style.backgroundColor = getCursorColor(id);
+                label.style.color = '#fff';
+                label.style.fontFamily = 'sans-serif';
+                label.style.fontSize = '12px';
+                label.style.fontWeight = 'bold';
+                label.style.padding = '2px 8px';
+                label.style.borderRadius = '12px';
+                label.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                label.style.whiteSpace = 'nowrap';
+
+                cursorEl.appendChild(svg);
+                cursorEl.appendChild(label);
+                document.body.appendChild(cursorEl); // Append to body for global tracking
+                mouseNodes[id] = cursorEl;
+            }
+            cursorEl.style.left = x + 'px';
+            cursorEl.style.top = y + 'px';
+        }
+
+        function removeMouseNode(id) {
+            if (mouseNodes[id]) {
+                mouseNodes[id].remove();
+                delete mouseNodes[id];
+            }
+        }
+
+        // Colors for random users
+        const userColors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+        function getCursorColor(id) {
+            let hash = 0;
+            for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+            return userColors[Math.abs(hash) % userColors.length];
+        }
+
+        // --- API / PROJECTS LOGIC (Self-Hosted) ---
+
+        async function loadProjects() {
+            try {
+                var data = await api('GET', '/api/projects');
+                projectsList = data;
+                renderProjects();
+
+                if (!activeProjectId && serverLastProjectId) {
+                    if (projectsList.some(function(p) { return p.id == serverLastProjectId; })) {
+                        await openProject(Number(serverLastProjectId), true);
+                    }
+                    serverLastProjectId = null;
+                }
+            } catch (e) {
+                console.error(e);
+                notify('Ошибка загрузки проектов');
+            }
+        }
+
+        function renderProjects() {
+            const pUI = document.getElementById('projectsUI');
+            pUI.innerHTML = '';
+
+            projectsList.forEach((p, index) => {
+                const isActive = activeProjectId === p.id;
+                const li = document.createElement('li');
+                li.className = 'project-item' + (isActive ? ' active' : '');
+
+                const indicator = isActive ? `<span style="color:#4caf50; font-size: 16px; margin-right: 5px;">•</span>` : `<span style="width: 14px; display:inline-block; margin-right: 5px;"></span>`;
+
+                li.innerHTML = `
+                <div class="project-info" onclick="openProject(${p.id})">
+                    <div class="project-name" style="${isActive ? 'color: #fff; font-weight: bold;' : ''}">${indicator}${p.name}</div>
+                    <div class="project-path" style="padding-left: 19px;">${p.folder_path || 'No path'}</div>
+                </div>
+                <div class="project-actions">
+                    <span class="del-btn" style="color:#aaa;" onclick="openEditProject(${p.id}, event)">⚙️</span>
+                    <span class="del-btn" onclick="deleteProject(${p.id}, event)">🗑</span>
+                </div>
+            `;
+                pUI.appendChild(li);
+            });
+        }
+
+        function showNewProject() {
+            document.getElementById('pname').value = '';
+            document.getElementById('modProject').style.display = 'flex';
+            document.getElementById('pname').focus();
+        }
+
+        function openEditProject(id, e) {
+            e.stopPropagation();
+            const proj = projectsList.find(p => p.id === id);
+            if (!proj) return;
+            editingProjectId = id;
+            document.getElementById('editPname').value = proj.name;
+            document.getElementById('modEditProject').style.display = 'flex';
+        }
+
+        async function saveEditProject() {
+            if (!editingProjectId) return;
+            const newName = document.getElementById('editPname').value.trim();
+            if (!newName) return;
+
+            try {
+                await api('PUT', '/api/projects/' + editingProjectId, { name: newName });
+
+                document.getElementById('modEditProject').style.display = 'none';
+                loadProjects();
+
+                if (activeProjectId === editingProjectId) {
+                    document.getElementById('activeProjectLabel').textContent = `[ ${newName} ]`;
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Ошибка переименования");
+            }
+        }
+
+        async function changeProjectFolder() {
+            if (!editingProjectId) return;
+            try {
+                const dirHandle = await window.showDirectoryPicker();
+                const folderPath = dirHandle.name;
+
+                await api('PUT', '/api/projects/' + editingProjectId, { folder_path: folderPath });
+
+                await set(`roode_handle_${editingProjectId}`, dirHandle);
+
+                document.getElementById('modEditProject').style.display = 'none';
+                loadProjects();
+
+                if (activeProjectId === editingProjectId) {
+                    openProject(editingProjectId);
+                } else {
+                    notify("Папка проекта изменена");
+                }
+            } catch (e) {
+                console.log("Folder change cancelled", e);
+            }
+        }
+
+        async function createProject() {
+            const name = document.getElementById('pname').value.trim();
+            if (!name) return;
+
+            try {
+                const dirHandle = await window.showDirectoryPicker();
+                const folderPath = dirHandle.name;
+
+                var newProj = await api('POST', '/api/projects', { name: name, folder_path: folderPath });
+
+                await set(`roode_handle_${newProj.id}`, dirHandle);
+
+                document.getElementById('modProject').style.display = 'none';
+                await loadProjects();
+                notify(`Проект ${name} создан!`);
+
+                fHandle = dirHandle;
+                isDir = true;
+                activeProjectId = newProj.id;
+                loadWorkspaceFromHandle(newProj.name);
+
+            } catch (e) {
+                console.log("Creation cancelled or failed", e);
+            }
+        }
+
+        async function deleteProject(id, e) {
+            e.stopPropagation();
+            if (!confirm('Удалить проект из базы? Файлы на диске останутся.')) return;
+
+            try {
+                await api('DELETE', '/api/projects/' + id);
+
+                await del(`roode_handle_${id}`);
+
+                if (activeProjectId === id) {
+                    activeProjectId = null;
+                    saveLastProjectToServer(null);
+                    document.getElementById('activeProjectLabel').textContent = "No Project";
+                    document.getElementById('activeProjectStatus').style.backgroundColor = "#f44";
+                }
+                loadProjects();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function verifyPermission(fileHandle, readWrite) {
+            const options = {};
+            if (readWrite) {
+                options.mode = 'readwrite';
+            }
+            if ((await fileHandle.queryPermission(options)) === 'granted') {
+                return true;
+            }
+            if ((await fileHandle.requestPermission(options)) === 'granted') {
+                return true;
+            }
+            return false;
+        }
+
+        async function openProject(id, isStartup = false) {
+            const proj = projectsList.find(p => p.id === id);
+            if (!proj) return;
+
+            try {
+                let handle = await get(`roode_handle_${proj.id}`);
+
+                if (handle) {
+                    // Ask permission nicely instead of system prompt if possible
+                    const hasPerm = await verifyPermission(handle, true);
+                    if (!hasPerm) {
+                        if (isStartup) return; // Don't throw errors on startup if user didn't grant perm yet
+                        throw new Error("No permission");
+                    }
+                } else {
+                    // Because of browser security, we can't just auto-open a path from DB without user interaction.
+                    // We ask them to select the folder again to grant permissions.
+                    alert(`Папка для проекта не найдена в кэше браузера.\nПожалуйста, выберите папку заново: ${proj.folder_path} для проекта ${proj.name}`);
+                    handle = await window.showDirectoryPicker();
+                    // Save it to cache for next time
+                    await set(`roode_handle_${proj.id}`, handle);
+                }
+
+                fHandle = handle;
+                isDir = true;
+                activeProjectId = proj.id;
+                saveLastProjectToServer(proj.id);
+
+                loadWorkspaceFromHandle(proj.name);
+
+                // Attempt to load the last opened file
+                if (proj.last_file) {
+                    for await (const [n, h] of fHandle.entries()) {
+                        if (h.kind === 'file' && n === proj.last_file) {
+                            await load(h);
+                            break;
+                        }
+                    }
+                }
+
+            } catch (e) {
+                console.error("Folder selection cancelled/failed", e);
+            }
+        }
+
+        function loadWorkspaceFromHandle(projectName) {
+            label.textContent = fHandle.name.toUpperCase();
+            document.getElementById('activeProjectLabel').textContent = `[ ${projectName} ]`;
+            document.getElementById('activeProjectLabel').style.color = "#4caf50";
+            document.getElementById('activeProjectStatus').style.backgroundColor = "#4caf50";
+            document.getElementById('activeProjectStatus').style.boxShadow = "0 0 8px #4caf50";
+            document.getElementById('versionBar').style.display = 'flex';
+
+            // Restore this project's version tag from localStorage
+            const versionEl = document.getElementById('versionInput');
+            versionEl.value = localStorage.getItem(`roode_version_${activeProjectId}`) || '1.0.0';
+            // Save on every change
+            versionEl.oninput = () => {
+                localStorage.setItem(`roode_version_${activeProjectId}`, versionEl.value);
+            };
+
+            projectMemory = {}; filesCache = []; resetEd();
+            listRender();
+            switchSidebar('explorer');
+            renderProjects(); // Re-render sidebar to update the green dot
+        }
+
+        // --- FILE LOGIC ---
+
+        async function saveAs() {
+            try {
+                const options = {
+                    types: [{ description: 'RuPL/MD File', accept: { 'text/plain': ['.PRSH', '.PRSHX', '.md', '.markdown'] } }],
+                    suggestedName: fileH ? fileH.name : 'Untitled.PRSH'
+                };
+                const newHandle = await window.showSaveFilePicker(options);
+                const w = await newHandle.createWritable();
+                await w.write(ed.value); await w.close();
+                notify(`Saved as: ${newHandle.name}`);
+                if (!isDir) { filesCache.push(newHandle); projectMemory[newHandle.name] = ed.value; }
+                listRender();
+                load(newHandle);
+            } catch (err) { }
+        }
+
+        function exportTxt() {
+            const blob = new Blob([ed.value], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = (fileH ? fileH.name : 'code') + '.txt';
+            a.click();
+        }
+
+        // --- VERSION CONTROL ---
+
+        // --- TRANSLATOR LOGIC ---
+        let lastTranslationBackup = null;
+
+        function openTranslator() {
+            document.getElementById('modTranslate').style.display = 'flex';
+            document.getElementById('btnUndoTranslation').style.display = lastTranslationBackup ? 'flex' : 'none';
+        }
+
+        async function doTranslateChunks(text, targetLang, sourceLang = 'auto') {
+            const chunks = [];
+            let currentChunk = '';
+            const lines = text.split('\n');
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if ((currentChunk.length + line.length) > 1000) {
+                    chunks.push(currentChunk);
+                    currentChunk = '';
+                }
+                currentChunk += line + (i === lines.length - 1 ? '' : '\n');
+            }
+            if (currentChunk) chunks.push(currentChunk);
+
+            let translatedText = '';
+            for (const chunk of chunks) {
+                if (!chunk.trim()) {
+                    translatedText += chunk;
+                    continue;
+                }
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(chunk)}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Ошибка API перевода');
+                const data = await res.json();
+                const translatedChunk = data[0].map(x => x[0]).join('');
+                translatedText += translatedChunk;
+            }
+            return translatedText;
+        }
+
+        async function startTranslation() {
+            const scope = document.getElementById('tlScope').value;
+            const src = document.getElementById('tlSourceLang').value;
+            const tgt = document.getElementById('tlTargetLang').value;
+            const btn = document.getElementById('btnRunTranslate');
+
+            if (scope === 'file') {
+                if (!fileH || !ed.value.trim()) return alert("Нет открытого файла для перевода");
+
+                // Backup for simple undo string
+                lastTranslationBackup = { content: ed.value };
+                document.getElementById('btnUndoTranslation').style.display = 'flex';
+
+                btn.textContent = "Перевод файла...";
+                btn.disabled = true;
+                notify("Ожидайте, идёт перевод...");
+                try {
+                    const trans = await doTranslateChunks(ed.value, tgt, src);
+                    ed.value = trans;
+                    updateLines();
+                    scheduleMinimapRender();
+                    ed.dispatchEvent(new Event('input')); // trigger save
+                    notify("✓ Файл успешно переведён");
+                } catch (e) {
+                    console.error(e);
+                    alert("Ошибка перевода: " + e.message);
+                }
+                btn.textContent = "Перевести";
+                btn.disabled = false;
+
+            } else if (scope === 'project') {
+                if (!activeProjectId || !fHandle) return alert("Нет активного проекта");
+
+                btn.textContent = "Бэкап...";
+                btn.disabled = true;
+
+                // Safe Snapshot
+                document.getElementById('versionInput').value = document.getElementById('versionInput').value + " [До перевода]";
+                await saveVersion();
+                notify("Снимок проекта перед переводом сохранён в Историю. Начинаем перевод...");
+
+                btn.textContent = "Перевод проекта...";
+
+                try {
+                    const filesDict = await collectFilesForVersion(fHandle);
+
+                    let translatedCount = 0;
+                    for (const [filePath, content] of Object.entries(filesDict)) {
+                        if (filePath.match(/\.(png|jpg|jpeg|gif|zip|exe|bin|pdf|mp3|mp4)$/i)) continue; // skip binaries
+                        if (!content.trim()) continue;
+
+                        try {
+                            const trans = await doTranslateChunks(content, tgt, src);
+
+                            // write back to disk
+                            const parts = filePath.split('/');
+                            let dir = fHandle;
+                            for (let i = 0; i < parts.length - 1; i++) {
+                                dir = await dir.getDirectoryHandle(parts[i], { create: true });
+                            }
+                            const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+                            const w = await fileHandle.createWritable();
+                            await w.write(trans);
+                            await w.close();
+                            translatedCount++;
+                        } catch (e) {
+                            console.warn("Skipped file due to error: " + filePath, e);
+                        }
+                    }
+
+                    if (fileH) {
+                        try {
+                            const newFile = await fileH.getFile();
+                            ed.value = await newFile.text();
+                            updateLines();
+                            scheduleMinimapRender();
+                        } catch (e) { }
+                    }
+
+                    notify(`✓ Переведено файлов: ${translatedCount}.`);
+
+                } catch (e) {
+                    alert("Ошибка: " + e.message);
+                }
+
+                btn.textContent = "Перевести";
+                btn.disabled = false;
+            }
+
+            document.getElementById('modTranslate').style.display = 'none';
+        }
+
+        function undoTranslation() {
+            if (lastTranslationBackup && fileH) {
+                ed.value = lastTranslationBackup.content;
+                lastTranslationBackup = null;
+                document.getElementById('btnUndoTranslation').style.display = 'none';
+                updateLines();
+                scheduleMinimapRender();
+                ed.dispatchEvent(new Event('input'));
+                notify("Перевод отменён, возвращён старый текст.");
+            }
+        }
+
+        async function collectFilesForVersion(dirHandle, prefix = '') {
+            const result = {};
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (name.startsWith('.')) continue;
+                const path = prefix ? `${prefix}/${name}` : name;
+                if (handle.kind === 'directory') {
+                    Object.assign(result, await collectFilesForVersion(handle, path));
+                } else {
+                    const file = await handle.getFile();
+                    result[path] = await file.text();
+                }
+            }
+            return result;
+        }
+
+        async function saveVersion() {
+            if (!activeProjectId || !fHandle) return alert('Нет активного проекта');
+            const version = document.getElementById('versionInput').value.trim();
+            if (!version) return alert('Введите номер версии');
+            const label = prompt('Описание версии (не обязательно):', '') ?? '';
+
+            notify('Сохранение версии...');
+            try {
+                const files = await collectFilesForVersion(fHandle);
+                var saved = await api('POST', '/api/projects/' + activeProjectId + '/versions', { version: version, label: label || null, files: JSON.stringify(files) });
+                notify('✓ Версия ' + saved.version + ' сохранена');
+            } catch (e) {
+                console.error(e);
+                alert('Ошибка сохранения версии: ' + e.message);
+            }
+        }
+
+        async function showVersions() {
+            if (!activeProjectId) return alert('Нет активного проекта');
+            const el = document.getElementById('versionsList');
+            el.innerHTML = '<p style="opacity:0.5">Загрузка...</p>';
+            document.getElementById('modVersions').style.display = 'flex';
+            try {
+                var versions = await api('GET', '/api/projects/' + activeProjectId + '/versions');
+
+                if (versions.length === 0) {
+                    el.innerHTML = '<p style="opacity:0.5;text-align:center;">Нет сохранённых версий</p>';
+                    return;
+                }
+                el.innerHTML = versions.map(v => {
+                    const date = new Date(v.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    return `
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 8px; border-bottom:1px solid var(--border-color); gap:8px;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:bold; color:var(--accent-color);">v${v.version}</div>
+                            ${v.label ? `<div style="font-size:11px; opacity:0.7; margin-top:2px;">${v.label}</div>` : ''}
+                            <div style="font-size:11px; opacity:0.5; margin-top:2px;">${date}</div>
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <button onclick="restoreVersion(${v.id})"
+                                style="font-size:11px; padding:3px 9px; background:var(--accent-color); border:none; border-radius:3px; color:white; cursor:pointer;">
+                                ↩ Восстановить
+                            </button>
+                            <button onclick="deleteVersion(${v.id})"
+                                style="font-size:11px; padding:3px 7px; background:#c0392b; border:none; border-radius:3px; color:white; cursor:pointer;">
+                                🗑
+                            </button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                el.innerHTML = '<p style="color:#f44">Ошибка загрузки версий</p>';
+            }
+        }
+
+        async function restoreVersion(versionId) {
+            if (!confirm('Восстановить эту версию?\n\nВСЕ текущие файлы проекта на диске будут удалены и заменены файлами из выбранной версии.')) return;
+            notify('Восстановление версии...');
+            try {
+                var data = await api('GET', '/api/versions/' + versionId);
+                data.files = JSON.parse(data.files);
+
+                // Step 1: Delete ALL existing files/folders in project root
+                async function clearDirectory(dirHandle) {
+                    for await (const [name] of dirHandle.entries()) {
+                        try {
+                            await dirHandle.removeEntry(name, { recursive: true });
+                        } catch (e) {
+                            console.warn('Could not remove', name, e);
+                        }
+                    }
+                }
+                await clearDirectory(fHandle);
+
+                // Step 2: Write all files from the snapshot
+                for (const [filePath, content] of Object.entries(data.files)) {
+                    const parts = filePath.split('/');
+                    let dir = fHandle;
+                    for (let i = 0; i < parts.length - 1; i++) {
+                        dir = await dir.getDirectoryHandle(parts[i], { create: true });
+                    }
+                    const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+                    const w = await fileHandle.createWritable();
+                    await w.write(content);
+                    await w.close();
+                }
+
+                // Step 3: Reset editor state and re-render
+                projectMemory = {};
+                filesCache = [];
+                document.getElementById('modVersions').style.display = 'none';
+                notify(`✓ Версия v${data.version} восстановлена`);
+                listRender();
+
+                if (fileH) {
+                    const restoredContent = data.files[fileH.name];
+                    if (restoredContent !== undefined) {
+                        ed.value = restoredContent;
+                        updateLines();
+                        scheduleMinimapRender();
+                    } else {
+                        resetEd();
+                    }
+                } else {
+                    scheduleMinimapRender();
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Ошибка восстановления: ' + e.message);
+            }
+        }
+
+        async function deleteVersion(versionId) {
+            if (!confirm('Удалить эту версию?')) return;
+            try {
+                await api('DELETE', '/api/versions/' + versionId);
+                showVersions();
+            } catch (e) {
+                alert('Ошибка удаления версии');
+            }
+        }
+
+        async function exportZip() {
+            if (!isDir && filesCache.length === 0) return alert('Нет открытых файлов для экспорта');
+            notify('Архивация...');
+            const zip = new JSZip();
+
+            // Recursively add directory contents to zip
+            async function addDirToZip(dirHandle, zipFolder) {
+                for await (const [name, handle] of dirHandle.entries()) {
+                    if (name.startsWith('.')) continue;
+                    if (handle.kind === 'directory') {
+                        const subFolder = zipFolder.folder(name);
+                        await addDirToZip(handle, subFolder);
+                    } else {
+                        const file = await handle.getFile();
+                        const data = await file.arrayBuffer();
+                        zipFolder.file(name, data);
+                    }
+                }
+            }
+
+            try {
+                if (isDir && fHandle) {
+                    await addDirToZip(fHandle, zip);
+                } else {
+                    for (let h of filesCache) {
+                        const ct = projectMemory[h.name];
+                        if (ct !== undefined) zip.file(h.name, ct);
+                    }
+                }
+
+                const blob = await zip.generateAsync({ type: 'blob' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = (fHandle ? fHandle.name : 'Roode-Export') + '.zip';
+                a.click();
+                notify('Успешно экспортировано');
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка экспорта");
+            }
+        }
+
+        function closeAll() {
+            if (!confirm("Закрыть всё?")) return;
+            projectMemory = {}; filesCache = []; fHandle = null; isDir = false;
+            activeProjectId = null;
+            localStorage.removeItem('roode_last_project');
+            document.getElementById('activeProjectLabel').textContent = "No Project";
+            document.getElementById('activeProjectLabel').style.color = "var(--text-color)";
+            document.getElementById('activeProjectStatus').style.backgroundColor = "#f44";
+            document.getElementById('activeProjectStatus').style.boxShadow = "none";
+            document.getElementById('versionBar').style.display = 'none';
+            label.textContent = "ПРОВОДНИК";
+
+            // Reset both panes
+            const prevActive = activePaneId;
+            setActivePane(1); resetEd();
+            setActivePane(2); resetEd();
+            setActivePane(prevActive);
+
+            listRender();
+            if (document.getElementById('tabProjects').classList.contains('active')) renderProjects();
+        }
+
+        async function selFolder() {
+            try {
+                fHandle = await window.showDirectoryPicker();
+                isDir = true; label.textContent = fHandle.name.toUpperCase();
+                activeProjectId = null;
+                localStorage.removeItem('roode_last_project');
+                document.getElementById('activeProjectLabel').textContent = "Local Folder";
+                document.getElementById('activeProjectLabel').style.color = "var(--text-color)";
+                document.getElementById('activeProjectStatus').style.backgroundColor = "#ff9800";
+                document.getElementById('activeProjectStatus').style.boxShadow = "none";
+                projectMemory = {}; filesCache = []; resetEd(); listRender();
+                switchSidebar('explorer');
+                if (document.getElementById('tabProjects').classList.contains('active')) renderProjects();
+            } catch (e) { }
+        }
+
+        function resetEd() { fileH = null; ed.value = ''; openTabs = []; renderTabs(); updateLines(); scheduleMinimapRender(); }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            if (ext === 'js') return '<span style="color:#f1e05a; font-weight:bold; font-size:14px;">JS</span>';
+            if (ext === 'html') return '<span style="color:#e34c26; font-weight:bold; font-size:14px;">&lt;/&gt;</span>';
+            if (ext === 'css') return '<span style="color:#563d7c; font-weight:bold; font-size:14px;">#</span>';
+            if (ext === 'json') return '<span style="color:#cb3837; font-weight:bold; font-size:14px;">{}</span>';
+            if (ext === 'md' || ext === 'markdown') return '<i class="fi fi-rr-document" style="color:#007acc; font-size:14px; position:relative; top:2px;"></i><span style="color:#007acc; font-weight:bold; font-size:10px; margin-left:-8px; position:relative; top:-2px;">M↓</span>';
+            if (ext === 'prsh') return '<img src="logo/rupl.svg" style="width:20px; height:20px; vertical-align:middle; object-fit:contain; margin-left:-2px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">';
+            if (ext === 'prshx') return '<img src="logo/ruplx.svg" style="width:20px; height:20px; vertical-align:middle; object-fit:contain; margin-left:-2px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">';
+            if (filename.match(/\.(png|jpe?g|gif|svg)$/i)) return '<i class="fi fi-rr-picture" style="color:#4caf50; font-size:14px; position:relative; top:2px;"></i>';
+            return '<i class="fi fi-rr-document" style="color:#a8a8a8; font-size:14px; position:relative; top:2px;"></i>';
+        }
+
+        let contextMenuTarget = null;
+        let contextFolderTarget = null; // { name, handle, parentHandle }
+        window.addEventListener('click', () => {
+            const menu = document.getElementById('fileContextMenu');
+            if (menu) menu.style.display = 'none';
+            const fmenu = document.getElementById('folderContextMenu');
+            if (fmenu) fmenu.style.display = 'none';
+        });
+
+        async function renameFileCtx() {
+            const h = contextMenuTarget;
+            if (!h) return;
+
+            let newName = prompt("Новое имя файла:", h.name);
+            if (!newName || newName === h.name) return;
+
+            if (isDir) {
+                try {
+                    let content;
+                    if (projectMemory[h.name] !== undefined) {
+                        content = projectMemory[h.name];
+                    } else {
+                        const f = await h.getFile();
+                        content = await f.arrayBuffer();
+                    }
+
+                    const parent = h._parentHandle || fHandle;
+                    const newHandle = await parent.getFileHandle(newName, { create: true });
+                    const w = await newHandle.createWritable();
+                    await w.write(content);
+                    await w.close();
+
+                    // Safely remove old handle 
+                    if (typeof h.remove === 'function') {
+                        await h.remove();
+                    } else {
+                        await parent.removeEntry(h.name);
+                    }
+
+                    let tab = openTabs.find(t => t.name === h.name);
+                    if (tab) {
+                        tab.name = newName;
+                        tab.h = newHandle;
+                    }
+                    if (fileH && fileH.name === h.name) {
+                        fileH = newHandle;
+                    }
+
+                    if (projectMemory[h.name] !== undefined) {
+                        projectMemory[newName] = projectMemory[h.name];
+                        delete projectMemory[h.name];
+                    }
+
+                } catch (e) {
+                    alert("Ошибка переименования: " + e.message);
+                }
+            } else {
+                alert("Переименование доступно только в проектах");
+            }
+            renderTabs();
+            listRender();
+        }
+
+        async function deleteFileCtx() {
+            const h = contextMenuTarget;
+            if (!h) return;
+            if (!confirm(`Удалить файл ${h.name}?`)) return;
+
+            if (isDir) {
+                const parent = h._parentHandle || fHandle;
+                try {
+                    if (typeof h.remove === 'function') {
+                        await h.remove();
+                    } else {
+                        await parent.removeEntry(h.name);
+                    }
+                } catch (e) {
+                    alert("Ошибка удаления файла: " + e.message);
+                }
+            } else {
+                filesCache = filesCache.filter(x => x.name !== h.name);
+                delete projectMemory[h.name];
+            }
+
+            // Remove from both panes
+            [1, 2].forEach(pId => {
+                const pane = panes[pId];
+                pane.openTabs = pane.openTabs.filter(x => x.name !== h.name);
+                if (pane.fileH && pane.fileH.name === h.name) {
+                    const prevActive = activePaneId;
+                    setActivePane(pId);
+                    if (pane.openTabs.length > 0) load(pane.openTabs[pane.openTabs.length - 1].h);
+                    else resetEd();
+                    setActivePane(prevActive);
+                }
+            });
+
+            renderTabs();
+            // also render tabs for non-active pane manually
+            const inactivePaneId = activePaneId === 1 ? 2 : 1;
+            renderTabsForPane(inactivePaneId);
+
+            listRender();
+        }
+
+        async function deleteFolderCtx() {
+            if (!contextFolderTarget) return;
+            const { name, parentHandle } = contextFolderTarget;
+            if (!confirm(`Удалить папку "${name}" и всё её содержимое?`)) return;
+            try {
+                await parentHandle.removeEntry(name, { recursive: true });
+                notify('🗑 Папка удалена: ' + name);
+                listRender();
+            } catch (e) {
+                alert('Ошибка удаления: ' + e.message);
+            }
+        }
+
+        async function moveFileToFolder(fileName, srcParentHint, destDirHandle) {
+            const srcParent = window._dragSourceParent;
+            const srcHandle = window._dragSourceHandle;
+            if (!srcParent || !srcHandle || !destDirHandle) return;
+            if (await srcParent.isSameEntry(destDirHandle)) return; // same folder, do nothing
+            try {
+                // Read content and discard file object to avoid OS file locking
+                let content;
+                {
+                    const file = await srcHandle.getFile();
+                    content = await file.arrayBuffer();
+                }
+                // Create file in destination
+                const newFile = await destDirHandle.getFileHandle(fileName, { create: true });
+                const writable = await newFile.createWritable();
+                await writable.write(content);
+                await writable.close();
+                // Remove from source safely
+                if (typeof srcHandle.remove === 'function') {
+                    await srcHandle.remove();
+                } else {
+                    await srcParent.removeEntry(fileName);
+                }
+                notify('📦 Перемещён: ' + fileName);
+                await listRender();
+            } catch (e) {
+                alert('Ошибка перемещения: ' + e.message);
+            }
+        }
+
+        async function listRender() {
+            ui.innerHTML = '';
+
+            if (isDir && fHandle) {
+                // Recursive tree for directory handles
+                await renderDirTree(fHandle, ui);
+
+                // Root-level drop zone — drag files back here from subfolders
+                ui.addEventListener('dragover', (e) => {
+                    // Only highlight if dragging over the list itself, not a folder
+                    if (e.target === ui || e.target.closest('#listUI') === ui && !e.target.closest('.folder-header')) {
+                        e.preventDefault();
+                        ui.style.outline = '2px dashed rgba(0,122,204,0.5)';
+                    }
+                });
+                ui.addEventListener('dragleave', (e) => {
+                    if (e.target === ui) ui.style.outline = '';
+                });
+                ui.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    if (e.target.closest('.folder-header')) return; // Ignore drops handled by folder listeners
+                    ui.style.outline = '';
+                    const fileName = e.dataTransfer.getData('text/plain');
+                    if (fileName && window._dragSourceParent) {
+                        const isSame = await window._dragSourceParent.isSameEntry(fHandle);
+                        if (!isSame) {
+                            await moveFileToFolder(fileName, null, fHandle);
+                        }
+                    }
+                });
+            } else if (!isDir) {
+                // Flat list for individually opened files
+                const list = [...filesCache].sort((a, b) => a.name.localeCompare(b.name));
+                list.forEach(h => {
+                    ui.appendChild(createFileItem(h));
+                });
+            }
+        }
+
+        async function renderDirTree(dirHandle, parentEl, parentHandle, currentPath = '') {
+            const folders = [];
+            const files = [];
+
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (name.startsWith('.')) continue;
+                if (handle.kind === 'directory') {
+                    folders.push({ name, handle });
+                } else {
+                    files.push(handle);
+                }
+            }
+
+            // Sort: folders first, then files, both alphabetical
+            folders.sort((a, b) => a.name.localeCompare(b.name));
+            files.sort((a, b) => a.name.localeCompare(b.name));
+
+            for (const folder of folders) {
+                const folderPath = currentPath + '/' + folder.name;
+                const folderEl = document.createElement('li');
+                folderEl.className = 'tree-folder';
+                if (openFolders.has(folderPath)) {
+                    folderEl.classList.add('open');
+                }
+
+                const header = document.createElement('div');
+                header.className = 'folder-header';
+                header.innerHTML = `<span class="chevron">▶</span> <i class="fi fi-sr-folder" style="color:#dcb67a; font-size:14px; position:relative; top:2px;"></i> ${folder.name}`;
+
+                // Right-click on folder header
+                header.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    contextFolderTarget = { name: folder.name, handle: folder.handle, parentHandle: dirHandle };
+                    const menu = document.getElementById('folderContextMenu');
+                    menu.style.display = 'flex';
+                    menu.style.left = e.pageX + 'px';
+                    menu.style.top = e.pageY + 'px';
+                };
+
+                // Drop target: accept files dragged here
+                header.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation(); // Prevent bubbling to root
+                    header.style.background = 'rgba(0,122,204,0.3)';
+                });
+                header.addEventListener('dragleave', (e) => {
+                    e.stopPropagation();
+                    header.style.background = '';
+                });
+                header.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation(); // CRITICAL: Stop root ui listener from catching this
+                    header.style.background = '';
+                    const fileName = e.dataTransfer.getData('text/plain');
+                    const srcParent = e.dataTransfer.getData('application/x-parent');
+                    if (fileName) {
+                        // Mark destination folder open so user sees moved file
+                        openFolders.add(folderPath);
+                        await moveFileToFolder(fileName, srcParent === 'root' ? fHandle : null, folder.handle);
+                    }
+                });
+
+                const children = document.createElement('ul');
+                children.className = 'folder-children';
+                children.style.listStyle = 'none';
+                children.style.padding = '0';
+                children.style.margin = '0';
+
+                folderEl.appendChild(header);
+                folderEl.appendChild(children);
+                parentEl.appendChild(folderEl);
+
+                // Eager-load children so contents are always visible
+                await renderDirTree(folder.handle, children, dirHandle, folderPath);
+
+                header.onclick = () => {
+                    const isOpen = folderEl.classList.toggle('open');
+                    if (isOpen) openFolders.add(folderPath);
+                    else openFolders.delete(folderPath);
+                };
+            }
+
+            for (const h of files) {
+                const item = createFileItem(h, dirHandle);
+                parentEl.appendChild(item);
+            }
+        }
+
+        function createFileItem(h, parentDirHandle) {
+            const li = document.createElement('li');
+            li.className = 'file-item';
+            li.dataset.name = h.name;
+            li.draggable = true;
+
+            if (fileH && fileH.name === h.name) li.classList.add('active');
+
+            const ico = getFileIcon(h.name);
+            li.innerHTML = `<span style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;"><span style="width:16px; display:inline-block; text-align:center;">${ico}</span><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${h.name}</span></span>`;
+            li.onclick = () => load(h);
+            li.oncontextmenu = (e) => {
+                e.preventDefault();
+                contextMenuTarget = h;
+                contextMenuTarget._parentHandle = parentDirHandle || fHandle;
+                const menu = document.getElementById('fileContextMenu');
+                menu.style.display = 'flex';
+                menu.style.left = e.pageX + 'px';
+                menu.style.top = e.pageY + 'px';
+            };
+
+            // Drag start
+            li.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', h.name);
+                e.dataTransfer.setData('application/x-parent', parentDirHandle === fHandle ? 'root' : 'sub');
+                li.style.opacity = '0.4';
+                // Store source parent globally for the move
+                window._dragSourceParent = parentDirHandle || fHandle;
+                window._dragSourceHandle = h;
+            });
+            li.addEventListener('dragend', () => {
+                li.style.opacity = '1';
+            });
+
+            return li;
+        }
+
+        function renderTabs() {
+            renderTabsForPane(activePaneId);
+        }
+
+        function renderTabsForPane(pId) {
+            const pane = panes[pId];
+            pane.tabBar.innerHTML = '';
+            if (pane.openTabs.length === 0) return;
+
+            pane.openTabs.forEach(tabObj => {
+                const isActive = (pane.fileH && pane.fileH.name === tabObj.name);
+                const t = document.createElement('div');
+                t.className = 'tab' + (isActive ? ' active' : '');
+
+                const dirtyMark = tabObj.isDirty ? '<span style="color:#f1e05a;">*</span>' : '';
+                t.innerHTML = `<span style="display:flex; align-items:center; gap:3px;">${getFileIcon(tabObj.name)} ${tabObj.name}${dirtyMark}</span><span class="tab-close">×</span>`;
+
+                t.onclick = (e) => {
+                    setActivePane(pId); // Switch active pane when clicking a tab
+                    if (e.target.className === 'tab-close') {
+                        e.stopPropagation();
+                        pane.openTabs = pane.openTabs.filter(x => x.name !== tabObj.name);
+
+                        // Only clear memory if it's not open in the OTHER pane too
+                        const otherPaneId = pId === 1 ? 2 : 1;
+                        const isOpenElsewhere = panes[otherPaneId].openTabs.some(x => x.name === tabObj.name);
+                        if (!isOpenElsewhere) delete projectMemory[tabObj.name];
+
+                        if (isActive) {
+                            if (pane.openTabs.length > 0) load(pane.openTabs[pane.openTabs.length - 1].h);
+                            else resetEd();
+                        } else {
+                            renderTabsForPane(pId);
+                        }
+                    } else {
+                        load(tabObj.h);
+                    }
+                };
+                pane.tabBar.appendChild(t);
+            });
+        }
+
+        async function load(h) {
+            // Backup current editor state BEFORE loading new file
+            if (fileH) {
+                projectMemory[fileH.name] = ed.value;
+            }
+
+            fileH = h;
+
+            // Add to tabs if not exists
+            let tabObj = openTabs.find(x => x.name === h.name);
+            if (!tabObj) {
+                tabObj = { h: h, name: h.name, isDirty: false };
+                openTabs.push(tabObj);
+            }
+
+            const items = document.querySelectorAll('.file-item');
+            items.forEach(li => {
+                li.classList.remove('active');
+                if (li.dataset.name === h.name) li.classList.add('active');
+            });
+
+            // Save last file to backend if inside a project
+            if (activeProjectId) {
+                api('PUT', '/api/projects/' + activeProjectId, { last_file: h.name })
+                    .then(function() {}).catch(function(e) { console.log(e); });
+            }
+
+            if (projectMemory[h.name] !== undefined) {
+                ed.value = projectMemory[h.name];
+            } else {
+                if (isDir) {
+                    const f = await h.getFile();
+                    ed.value = await f.text();
+                    projectMemory[h.name] = ed.value;
+                } else {
+                    if (h.isRemote) {
+                        ed.value = "// Загрузка по сети...";
+                        if (socket) {
+                            socket.emit('request-file', { file: h.name });
+                        }
+                    } else {
+                        ed.value = "";
+                        projectMemory[h.name] = "";
+                    }
+                }
+            }
+
+            msg.textContent = h.name;
+            renderTabs();
+            updateLines();
+            scheduleMinimapRender();
+            updateCursorStats();
+        }
+
+        async function save(isSilent = false) {
+            if (!fileH) return;
+
+            projectMemory[fileH.name] = ed.value;
+            let currentTab = openTabs.find(t => t.name === fileH.name);
+            if (currentTab) currentTab.isDirty = false;
+
+            if (fileH.isNote) {
+                const note = notesCache.find(n => n.id === fileH.id);
+                if (note) {
+                    note.content = ed.value;
+                    saveNotes();
+                    if (!isSilent) notify(`Заметка сохранена`);
+                }
+            } else if (isDir) {
+                const w = await fileH.createWritable(); await w.write(ed.value); await w.close();
+                if (!isSilent) notify(`Saved: ${fileH.name}`);
+            } else {
+                if (filesCache.length !== 0) {
+                    try {
+                        let c = 0;
+                        for (let h of filesCache) {
+                            const ct = projectMemory[h.name];
+                            if (ct !== undefined) { const w = await h.createWritable(); await w.write(ct); await w.close(); c++; }
+                        }
+                        if (!isSilent) notify(`✅ Updated ${c} files`);
+                    } catch (e) { !isSilent && alert("Err: " + e.message); }
+                } else if (fileH.isRemote && !isSilent) {
+                    notify(`Saved to memory: ${fileH.name}`);
+                }
+            }
+            renderTabs();
+        }
+
+        function notify(txt) { msg.textContent = txt; setTimeout(() => msg.textContent = 'Готов', 3000); }
+
+        function showNewFile() {
+            if (!isDir) return alert('Сначала откройте папку или проект');
+            window._createFileTarget = fHandle;
+            document.getElementById('fname').value = '';
+            document.getElementById('modFile').style.display = 'flex';
+            document.getElementById('fname').focus();
+        }
+
+        function showNewFileCtx() {
+            if (!contextFolderTarget) return;
+            window._createFileTarget = contextFolderTarget.handle;
+            document.getElementById('fname').value = '';
+            document.getElementById('modFile').style.display = 'flex';
+            document.getElementById('fname').focus();
+        }
+
+        async function createNewFolder() {
+            if (!isDir || !fHandle) return alert('Сначала откройте папку');
+            const name = prompt('Имя новой папки (в корне проекта):');
+            if (!name || !name.trim()) return;
+            try {
+                await fHandle.getDirectoryHandle(name.trim(), { create: true });
+                notify('📁 Папка создана: ' + name.trim());
+                listRender();
+            } catch (e) {
+                alert('Ошибка: ' + e.message);
+            }
+        }
+
+        async function createNewFolderCtx() {
+            if (!contextFolderTarget) return;
+            const name = prompt('Имя новой папки внутри "' + contextFolderTarget.name + '":');
+            if (!name || !name.trim()) return;
+            try {
+                await contextFolderTarget.handle.getDirectoryHandle(name.trim(), { create: true });
+                notify('📁 подпапка создана: ' + name.trim());
+                // Invalidate contextTarget? nah, just add it to openFolders path!
+                // Wait, getting path from contextFolderTarget is tricky without passing it everywhere.
+                // We'll just let them click it or we can do something else.
+                listRender();
+            } catch (e) {
+                alert('Ошибка: ' + e.message);
+            }
+        }
+
+        function collapseAllFolders() {
+            document.querySelectorAll('#listUI .tree-folder.open').forEach(el => {
+                el.classList.remove('open');
+            });
+        }
+
+        async function createFile() {
+            if (isCreating) return;
+
+            let n = document.getElementById('fname').value.trim();
+            if (!n) return;
+            if (!n.match(/\./)) {
+                // Default to .md if requested, otherwise .PRSH
+                n += '.PRSH';
+            }
+
+            isCreating = true;
+
+            try {
+                const targetDir = window._createFileTarget || fHandle;
+                const nh = await targetDir.getFileHandle(n, { create: true });
+                const w = await nh.createWritable(); await w.write('// Roode Project File\n\n'); await w.close();
+
+                document.getElementById('modFile').style.display = 'none';
+                await listRender();
+                await load(nh);
+                switchSidebar('explorer');
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка создания файла");
+            } finally {
+                isCreating = false;
+            }
+        }
+
+        // --- NOTES SYSTEM LOGIC ---
+        window.saveNotes = function () {
+            localStorage.setItem('roode_notes', JSON.stringify(notesCache));
+        }
+
+        window.loadNotes = function () {
+            try {
+                const raw = localStorage.getItem('roode_notes');
+                if (raw) notesCache = JSON.parse(raw);
+            } catch (e) { console.error(e); }
+            renderNotes();
+        }
+
+        window.renderNotes = function () {
+            const list = document.getElementById('notesUI');
+            list.innerHTML = '';
+            if (notesCache.length === 0) {
+                list.innerHTML = '<div style="padding:10px; color:#aaa; font-size:12px; text-align:center;">Нет заметок. Нажмите + Новая</div>';
+                return;
+            }
+
+            notesCache.forEach(note => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                if (fileH && fileH.id === note.id) li.classList.add('active');
+
+                // Generate a fake 'handle' for the tab-system and load-system
+                const noteHandle = { name: "📝 " + note.title, id: note.id, isNote: true, kind: 'file' };
+
+                li.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;">
+                        <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;">📝 ${note.title}</span>
+                        <span onclick="deleteNote(event, '${note.id}')" style="cursor:pointer; color:#f44; padding:0 5px;" title="Удалить">🗑</span>
+                    </span>
+                `;
+                li.onclick = () => {
+                    projectMemory[noteHandle.name] = note.content;
+                    load(noteHandle);
+                };
+                list.appendChild(li);
+            });
+        }
+
+        window.showNewNote = function () {
+            document.getElementById('noteNameInput').value = '';
+            document.getElementById('newNoteOverlay').style.display = 'flex';
+            document.getElementById('noteNameInput').focus();
+        }
+
+        window.createNote = function () {
+            const title = document.getElementById('noteNameInput').value.trim();
+            if (!title) return;
+            const newNote = {
+                id: 'note_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                title: title,
+                content: ''
+            };
+            notesCache.push(newNote);
+            saveNotes();
+            renderNotes();
+
+            document.getElementById('newNoteOverlay').style.display = 'none';
+            // Open the created note immediately
+            const noteHandle = { name: "📝 " + title, id: newNote.id, isNote: true, kind: 'file' };
+            projectMemory[noteHandle.name] = '';
+            load(noteHandle);
+        }
+
+        window.deleteNote = function (e, id) {
+            e.stopPropagation();
+            if (!confirm('Удалить эту заметку навсегда?')) return;
+
+            const noteIndex = notesCache.findIndex(n => n.id === id);
+            if (noteIndex === -1) return;
+
+            const noteName = "📝 " + notesCache[noteIndex].title;
+            notesCache.splice(noteIndex, 1);
+            saveNotes();
+            renderNotes();
+
+            // Clear from open tabs on both panes
+            [1, 2].forEach(pId => {
+                const pane = panes[pId];
+                pane.openTabs = pane.openTabs.filter(x => x.name !== noteName);
+                if (pane.fileH && pane.fileH.name === noteName) {
+                    const prevActive = activePaneId;
+                    setActivePane(pId);
+                    if (pane.openTabs.length > 0) load(pane.openTabs[pane.openTabs.length - 1].h);
+                    else resetEd();
+                    setActivePane(prevActive);
+                }
+            });
+            delete projectMemory[noteName];
+            renderTabs();
+            renderTabsForPane(activePaneId === 1 ? 2 : 1);
+        }
+
+        // Shortcuts
+        document.addEventListener('keydown', async (e) => {
+            // SAVE: Ctrl + S
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                save();
+            }
+
+            // PRECH SWITCH PROJECT: Ctrl + [ or Ctrl + ]
+            if (e.ctrlKey && projectsList.length > 0) {
+                if (e.key === '[' || e.key === ']') {
+                    e.preventDefault();
+                    let currentIndex = projectsList.findIndex(p => p.id === activeProjectId);
+                    if (currentIndex === -1) currentIndex = 0;
+
+                    let nextIndex;
+                    if (e.key === ']') { // Next project
+                        nextIndex = (currentIndex + 1) % projectsList.length;
+                    } else { // Prev project
+                        nextIndex = (currentIndex - 1 + projectsList.length) % projectsList.length;
+                    }
+
+                    await openProject(projectsList[nextIndex].id);
+                }
+            }
+
+            // COMMAND PALETTE: Ctrl + P
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                showCommandPalette();
+            }
+
+            // FIND & REPLACE: Ctrl + F
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                openFindReplace();
+            }
+        });
+
+        // --- FIND & REPLACE LOGIC ---
+        let frMatches = [];
+        let frCurrentIndex = -1;
+
+        const frWidget = document.getElementById('findReplace');
+        const frFindInput = document.getElementById('frFindInput');
+        const frReplaceInput = document.getElementById('frReplaceInput');
+        const frMsg = document.getElementById('frMsg');
+
+        function openFindReplace() {
+            frWidget.style.display = 'flex';
+
+            // Pre-fill with selected text if any
+            const selection = ed.value.substring(ed.selectionStart, ed.selectionEnd);
+            if (selection && !selection.includes('\n')) {
+                frFindInput.value = selection;
+            }
+
+            frFindInput.focus();
+            frFindInput.select();
+            performFind();
+        }
+
+        function closeFindReplace() {
+            frWidget.style.display = 'none';
+            ed.focus();
+        }
+
+        function performFind() {
+            const query = frFindInput.value;
+            if (!query) {
+                frMatches = [];
+                frCurrentIndex = -1;
+                frMsg.textContent = 'Пусто';
+                return;
+            }
+
+            // Simple exact case-insensitive search
+            const text = ed.value.toLowerCase();
+            const searchStr = query.toLowerCase();
+
+            frMatches = [];
+            let startIndex = 0;
+            let index;
+
+            while ((index = text.indexOf(searchStr, startIndex)) > -1) {
+                frMatches.push(index);
+                startIndex = index + searchStr.length;
+            }
+
+            if (frMatches.length === 0) {
+                frCurrentIndex = -1;
+                frMsg.textContent = 'Нет совпадений';
+            } else {
+                // Find nearest match to cursor
+                const cursorPos = ed.selectionStart;
+                frCurrentIndex = frMatches.findIndex(m => m >= cursorPos);
+                if (frCurrentIndex === -1) frCurrentIndex = 0;
+
+                highlightMatch();
+            }
+        }
+
+        function highlightMatch() {
+            if (frMatches.length === 0 || frCurrentIndex === -1) return;
+
+            const pos = frMatches[frCurrentIndex];
+            const len = frFindInput.value.length;
+
+            ed.focus();
+            ed.setSelectionRange(pos, pos + len);
+
+            frMsg.textContent = `${frCurrentIndex + 1} из ${frMatches.length}`;
+
+            // Scroll to the selection
+            const textToCursor = ed.value.substring(0, pos);
+            const currentLine = textToCursor.split('\n').length;
+            const lineHeight = currentFontSize + 6;
+            const scrollPos = (currentLine - 1) * lineHeight;
+            ed.scrollTop = scrollPos - (ed.clientHeight / 2);
+        }
+
+        function frNext() {
+            if (frMatches.length === 0) return;
+            frCurrentIndex = (frCurrentIndex + 1) % frMatches.length;
+            highlightMatch();
+        }
+
+        function frPrev() {
+            if (frMatches.length === 0) return;
+            frCurrentIndex = (frCurrentIndex - 1 + frMatches.length) % frMatches.length;
+            highlightMatch();
+        }
+
+        function performReplace() {
+            if (frMatches.length === 0 || frCurrentIndex === -1) return;
+
+            const start = frMatches[frCurrentIndex];
+            const len = frFindInput.value.length;
+            const replaceStr = frReplaceInput.value;
+
+            // We only replace if the current selection actually matches
+            if (ed.selectionStart === start && ed.selectionEnd === start + len) {
+                const text = ed.value;
+                ed.value = text.substring(0, start) + replaceStr + text.substring(start + len);
+
+                // Adjust cursor and broadcast
+                ed.setSelectionRange(start + replaceStr.length, start + replaceStr.length);
+                ed.dispatchEvent(new Event('input')); // trigger save and broadcast
+
+                // Re-calculate matches because string length changed
+                performFind();
+            } else {
+                // Just jump to it if it wasn't selected
+                highlightMatch();
+            }
+        }
+
+        function performReplaceAll() {
+            if (!frFindInput.value) return;
+
+            // For simplicity, we use regex with global and case insensitive flags
+            // Need to escape regex characters in the find string
+            const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escapeRegExp(frFindInput.value), 'gi');
+
+            const text = ed.value;
+            const newText = text.replace(regex, frReplaceInput.value);
+
+            if (text !== newText) {
+                ed.value = newText;
+                ed.dispatchEvent(new Event('input'));
+                performFind(); // Recalculate (should be 0)
+                notify("Все совпадения заменены!");
+            }
+        }
+
+        frFindInput.addEventListener('input', performFind);
+        frFindInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (e.shiftKey) frPrev(); else frNext();
+            } else if (e.key === 'Escape') {
+                closeFindReplace();
+            }
+        });
+
+        frReplaceInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performReplace();
+            } else if (e.key === 'Escape') {
+                closeFindReplace();
+            }
+        });
+
+        document.getElementById('frNext').addEventListener('click', frNext);
+        document.getElementById('frPrev').addEventListener('click', frPrev);
+        document.getElementById('frReplaceBtn').addEventListener('click', performReplace);
+        document.getElementById('frReplaceAllBtn').addEventListener('click', performReplaceAll);
+
+        // --- COMMAND PALETTE LOGIC ---
+        let cmdItems = [];
+        let cmdSelectedIndex = 0;
+
+        function closeCommandPalette() {
+            document.getElementById('cmdPalette').style.display = 'none';
+            ed.focus();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('cmdPalette').style.display === 'flex') {
+                closeCommandPalette();
+            }
+        });
+
+        document.getElementById('cmdInput').addEventListener('keydown', (e) => {
+            const list = document.querySelectorAll('#cmdResults .cmd-item');
+            if (list.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                cmdSelectedIndex = (cmdSelectedIndex + 1) % list.length;
+                renderCmdResults();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                cmdSelectedIndex = (cmdSelectedIndex - 1 + list.length) % list.length;
+                renderCmdResults();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (cmdItems[cmdSelectedIndex]) {
+                    cmdItems[cmdSelectedIndex].action();
+                    closeCommandPalette();
+                }
+            }
+        });
+
+        document.getElementById('cmdInput').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            if (!query) {
+                cmdItems = buildCmdList();
+            } else {
+                cmdItems = buildCmdList().filter(item => item.name.toLowerCase().includes(query));
+            }
+            cmdSelectedIndex = 0;
+            renderCmdResults();
+        });
+
+        function buildCmdList() {
+            let items = [];
+
+            // Gather files
+            let allFiles = [];
+            if (isDir && fHandle) {
+                // Async collection of handles is slow, so we rely on the cached list from UI or memory for speed
+                document.querySelectorAll('#listUI .file-item').forEach(li => {
+                    allFiles.push(li.dataset.name);
+                });
+            } else {
+                allFiles = filesCache.map(f => f.name);
+            }
+
+            allFiles.forEach(fileName => {
+                items.push({
+                    name: `Файл: ${fileName}`,
+                    icon: getFileIcon(fileName),
+                    action: () => {
+                        const fileLi = Array.from(document.querySelectorAll('#listUI .file-item')).find(li => li.dataset.name === fileName);
+                        if (fileLi) fileLi.click();
+                    }
+                });
+            });
+
+            // Global Commands
+            items.push({ name: '> Сменить тему', icon: '🎨', action: () => openSettings() });
+            items.push({ name: '> Открыть настройки', icon: '⚙️', action: () => openSettings() });
+            if (activeRoom) {
+                items.push({ name: '> Покинуть сессию', icon: '🏃', action: () => toggleCollab() });
+            }
+
+            return items;
+        }
+
+        function renderCmdResults() {
+            const ul = document.getElementById('cmdResults');
+            ul.innerHTML = '';
+            cmdItems.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'cmd-item' + (index === cmdSelectedIndex ? ' selected' : '');
+                li.innerHTML = `<span style="width:20px; text-align:center;">${item.icon}</span> <span>${item.name}</span>`;
+                li.onclick = () => { item.action(); closeCommandPalette(); };
+                li.onmouseover = () => { cmdSelectedIndex = index; renderCmdResults(); };
+                ul.appendChild(li);
+            });
+            // Auto-scroll logic could be added here
+        }
+
+        async function showCommandPalette() {
+            document.getElementById('cmdPalette').style.display = 'flex';
+            document.getElementById('cmdInput').value = '';
+            cmdItems = buildCmdList();
+            cmdSelectedIndex = 0;
+            renderCmdResults();
+            document.getElementById('cmdInput').focus();
+        }
+
+        // --- AUTOCOMPLETE LOGIC ---
+        // Dynamically extracted from document now
+
+        let acMatches = [];
+        let acSelectedIndex = 0;
+        let acCurrentWord = '';
+        let acStartPos = 0;
+        const acPopup = document.getElementById('autocomplete');
+
+        function positionAutocomplete() {
+            // Very roughly position autocomplete near cursor
+            const textToCursor = ed.value.substring(0, ed.selectionStart);
+            const lines = textToCursor.split('\n');
+            const currentLine = lines.length;
+            const currentCol = lines[lines.length - 1].length;
+
+            const fontWidth = currentFontSize * 0.6;
+            const lineHeight = currentFontSize + 6;
+
+            const topOffset = (currentLine * lineHeight) - ed.scrollTop + 10;
+            const leftOffset = (currentCol * fontWidth) - ed.scrollLeft + 40; // +40 for gutter + padding
+
+            acPopup.style.top = topOffset + 'px';
+            acPopup.style.left = leftOffset + 'px';
+        }
+
+        function renderAutocomplete() {
+            acPopup.innerHTML = '';
+            if (acMatches.length === 0) {
+                acPopup.style.display = 'none';
+                return;
+            }
+
+            acPopup.style.display = 'block';
+            positionAutocomplete();
+
+            acMatches.forEach((word, index) => {
+                const li = document.createElement('li');
+                li.className = 'ac-item' + (index === acSelectedIndex ? ' selected' : '');
+
+                // Highlight the typed part
+                const matchIndex = word.toLowerCase().indexOf(acCurrentWord.toLowerCase());
+                if (matchIndex === 0) {
+                    const typed = word.substring(0, acCurrentWord.length);
+                    const rest = word.substring(acCurrentWord.length);
+                    li.innerHTML = `<span style="color:#569cd6">${typed}</span>${rest}`;
+                } else {
+                    li.textContent = word; // Just in case it matched in middle (though our logic does startsWith usually)
+                }
+
+                li.onmousedown = (e) => {
+                    e.preventDefault(); // prevent losing focus
+                    insertAutocomplete(word);
+                };
+                li.onmouseover = () => { acSelectedIndex = index; renderAutocomplete(); };
+                acPopup.appendChild(li);
+            });
+        }
+
+        function handleAutocompleteInput() {
+            if (frWidget.style.display === 'flex') return; // Don't autocomplete while searching
+
+            if (!document.getElementById('autocompleteCheck').checked) {
+                acMatches = [];
+                renderAutocomplete();
+                return;
+            }
+
+            const cursorPos = ed.selectionStart;
+            const textToCursor = ed.value.substring(0, cursorPos);
+
+            // Find current word (supports English and Cyrillic)
+            const match = textToCursor.match(/([a-zA-Z0-9_\u0400-\u04FF]+)$/);
+            if (!match) {
+                acMatches = [];
+                renderAutocomplete();
+                return;
+            }
+
+            acCurrentWord = match[1];
+            acStartPos = cursorPos - acCurrentWord.length;
+
+            if (acCurrentWord.length < 2) {
+                acMatches = [];
+                renderAutocomplete();
+                return;
+            }
+
+            const query = acCurrentWord.toLowerCase();
+
+            // Extract all words from document dynamically
+            const allWords = ed.value.match(/[a-zA-Z0-9_\u0400-\u04FF]+/g) || [];
+            // Get unique words, excluding the exact word currently being typed
+            const uniqueWords = [...new Set(allWords)].filter(w => w !== acCurrentWord);
+
+            acMatches = uniqueWords.filter(w => w.toLowerCase().startsWith(query)).slice(0, 8);
+            acSelectedIndex = 0;
+            renderAutocomplete();
+        }
+
+        function insertAutocomplete(word) {
+            const before = ed.value.substring(0, acStartPos);
+            const after = ed.value.substring(ed.selectionEnd);
+
+            ed.value = before + word + after;
+
+            const newPos = acStartPos + word.length;
+            ed.setSelectionRange(newPos, newPos);
+            ed.dispatchEvent(new Event('input')); // trigger save & broadcast
+
+            acMatches = [];
+            renderAutocomplete();
+            ed.focus();
+        }
+
+        ed.addEventListener('input', handleAutocompleteInput);
+
+        // Hide autocomplete when clicking elsewhere
+        ed.addEventListener('blur', () => {
+            setTimeout(() => {
+                acMatches = [];
+                renderAutocomplete();
+            }, 100);
+        });
+
+        ed.addEventListener('keydown', (e) => {
+            if (acMatches.length > 0 && acPopup.style.display === 'block') {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    acSelectedIndex = (acSelectedIndex + 1) % acMatches.length;
+                    renderAutocomplete();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    acSelectedIndex = (acSelectedIndex - 1 + acMatches.length) % acMatches.length;
+                    renderAutocomplete();
+                } else if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    insertAutocomplete(acMatches[acSelectedIndex]);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    acMatches = [];
+                    renderAutocomplete();
+                } else if (e.key === ' ' || e.key === '(' || e.key === '.') {
+                    // Close on space or syntax chars
+                    acMatches = [];
+                    renderAutocomplete();
+                }
+            } else {
+                // If popup is closed and user hits Tab, indent normally
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const start = ed.selectionStart;
+                    const end = ed.selectionEnd;
+                    ed.value = ed.value.substring(0, start) + "    " + ed.value.substring(end);
+                    ed.selectionStart = ed.selectionEnd = start + 4;
+                    ed.dispatchEvent(new Event('input'));
+                }
+            }
+        });
+
+        // Init global hooks for inline HTML onclick handlers since module scope encapsulates standard scripts
+        window.selFolder = selFolder;
+        window.showNewFile = showNewFile;
+        window.showNewFileCtx = showNewFileCtx;
+        window.createNewFolder = createNewFolder;
+        window.createNewFolderCtx = createNewFolderCtx;
+        window.collapseAllFolders = collapseAllFolders;
+        window.deleteFolderCtx = deleteFolderCtx;
+        window.moveFileToFolder = moveFileToFolder;
+        window.save = save;
+        window.toggleMenu = toggleMenu;
+        window.saveAs = saveAs;
+        window.exportTxt = exportTxt;
+        window.exportZip = exportZip;
+        window.closeAll = closeAll;
+        window.listRender = listRender;
+        window.showNewProject = showNewProject;
+        window.createProject = createProject;
+        window.deleteProject = deleteProject;
+        window.openEditProject = openEditProject;
+        window.saveEditProject = saveEditProject;
+        window.changeProjectFolder = changeProjectFolder;
+        window.openProject = openProject;
+        window.createFile = createFile;
+        window.switchSidebar = switchSidebar;
+        window.updateCursorStats = updateCursorStats;
+        window.changeTheme = changeTheme;
+        window.renameFileCtx = renameFileCtx;
+        window.deleteFileCtx = deleteFileCtx;
+        window.closeFindReplace = closeFindReplace;
+        window.suggestChanges = suggestChanges;
+        window.saveVersion = saveVersion;
+        window.showVersions = showVersions;
+        window.restoreVersion = restoreVersion;
+        window.deleteVersion = deleteVersion;
+        window.openTranslator = openTranslator;
+        window.startTranslation = startTranslation;
+        window.undoTranslation = undoTranslation;
+
+        async function performGlobalSearch() {
+            var query = document.getElementById('globalSearchInput').value.toLowerCase();
+            var resultsUI = document.getElementById('searchResultsUI');
+            if (!resultsUI) return;
+            resultsUI.innerHTML = '';
+            if (!query) return;
+            resultsUI.innerHTML = '<li style="padding:10px; color:#888;">Поиск...</li>';
+            var results = [];
+            if (activeProjectId && fHandle) {
+                async function searchDir(dh, prefix) {
+                    for await (var entry of dh.entries()) {
+                        var eName = entry[0], eHandle = entry[1];
+                        if (eName.startsWith('.')) continue;
+                        var fp = prefix ? (prefix + '/' + eName) : eName;
+                        if (eHandle.kind === 'directory') {
+                            await searchDir(eHandle, fp);
+                        } else {
+                            if (/\.(png|jpe?g|gif|svg|zip|exe|bin|pdf|mp3|mp4)$/i.test(eName)) continue;
+                            try {
+                                var ct = projectMemory[eName];
+                                if (ct === undefined) {
+                                    var fl = await eHandle.getFile();
+                                    if (fl.size > 2097152) continue;
+                                    ct = await fl.text();
+                                }
+                                var lns = ct.split('\n');
+                                for (var li = 0; li < lns.length; li++) {
+                                    if (lns[li].toLowerCase().includes(query)) {
+                                        results.push({ handle: eHandle, name: fp, line: li + 1, content: lns[li].trim().substring(0, 120) });
+                                    }
+                                }
+                            } catch(ex) {}
+                        }
+                    }
+                }
+                await searchDir(fHandle, '');
+            } else {
+                for (var fi = 0; fi < filesCache.length; fi++) {
+                    var fh = filesCache[fi];
+                    var ct2 = projectMemory[fh.name] || '';
+                    var lns2 = ct2.split('\n');
+                    for (var li2 = 0; li2 < lns2.length; li2++) {
+                        if (lns2[li2].toLowerCase().includes(query)) {
+                            results.push({ handle: fh, name: fh.name, line: li2 + 1, content: lns2[li2].trim().substring(0, 120) });
+                        }
+                    }
+                }
+            }
+            resultsUI.innerHTML = '';
+            if (results.length === 0) {
+                resultsUI.innerHTML = '<li style="padding:10px; color:#888;">Ничего не найдено</li>';
+                return;
+            }
+            for (var ri = 0; ri < results.length; ri++) {
+                (function(res) {
+                    var li = document.createElement('li');
+                    li.className = 'file-item';
+                    li.style.flexDirection = 'column';
+                    li.style.alignItems = 'flex-start';
+                    li.style.borderBottom = '1px solid var(--border-color)';
+                    li.style.padding = '8px 15px';
+                    var esc = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    var rx = new RegExp('(' + esc + ')', 'gi');
+                    var hl = res.content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(rx, '<span style="background:rgba(255,200,0,0.35);color:#fff;font-weight:bold;">$1</span>');
+                    li.innerHTML = '<div style="font-size:12px;font-weight:bold;color:var(--accent-color);margin-bottom:3px;">' + res.name + ':' + res.line + '</div>' +
+                        '<div style="font-size:11px;color:var(--text-color);opacity:0.8;word-break:break-all;font-family:var(--editor-font);">' + hl + '</div>';
+                    li.onclick = function() {
+                        load(res.handle).then(function() {
+                            setTimeout(function() {
+                                var ls = ed.value.split('\n');
+                                var cp = 0;
+                                for (var j = 0; j < res.line - 1; j++) {
+                                    if (ls[j] !== undefined) cp += ls[j].length + 1;
+                                }
+                                ed.setSelectionRange(cp, cp);
+                                ed.focus();
+                                var lh = parseInt(getComputedStyle(ed).lineHeight) || 20;
+                                ed.scrollTop = Math.max(0, (res.line - 1) * lh - 100);
+                                updateLines();
+                                updateCursorStats();
+                            }, 50);
+                        });
+                    };
+                    resultsUI.appendChild(li);
+                })(results[ri]);
+            }
+        }
+        window.performGlobalSearch = performGlobalSearch;
+
+        updateLines();
+        window.loadNotes();
+        checkAuth(); // Kick off flow, either shows logic or loads projects
+
+    </script>
+</body>
+
+</html>
