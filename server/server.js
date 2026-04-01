@@ -22,9 +22,18 @@ for (const envPath of [
 // ============ CONFIG ============
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'roode_super_secret_key_change_me';
-const DB_URL = process.env.DATABASE_URL || 'postgresql://roode:roode_pass@localhost:5432/roode_db';
+const DB_URL = process.env.DATABASE_URL;
+const poolConfig = DB_URL ? {
+    connectionString: DB_URL
+} : {
+    host: process.env.PGHOST || 'localhost',
+    port: Number(process.env.PGPORT || 5432),
+    user: process.env.PGUSER || 'roode',
+    password: process.env.PGPASSWORD || 'roode_pass',
+    database: process.env.PGDATABASE || 'roode_db'
+};
 
-const pool = new Pool({ connectionString: DB_URL });
+const pool = new Pool(poolConfig);
 
 const app = express();
 app.set('trust proxy', 1);
@@ -244,8 +253,13 @@ app.delete('/api/versions/:id', authMiddleware, async (req, res) => {
 
 // ============ NOTES ROUTES ============
 
-app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, service: 'roode-server' });
+app.get('/api/health', async (_req, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.json({ ok: true, service: 'roode-server', database: 'up' });
+    } catch (error) {
+        res.status(503).json({ ok: false, service: 'roode-server', database: 'down' });
+    }
 });
 
 // List notes

@@ -19,7 +19,64 @@ Repository: [STTS66/roode](https://github.com/STTS66/roode)
 - `server/deploy/systemd/roode.service` - systemd service
 - `server/DEPLOY_VDS.md` - detailed deployment guide
 
-## Quick deploy to VDS with WinSCP
+## Quick deploy to VDS with Docker
+
+This is now the easiest deployment flow for `roode.pp.ua`.
+
+### 1. Install Docker on the server
+
+```bash
+apt update
+apt install -y docker.io docker-compose-v2
+systemctl enable --now docker
+```
+
+### 2. Download the repository on the server
+
+```bash
+cd /opt
+git clone https://github.com/STTS66/roode.git
+cd /opt/roode
+```
+
+### 3. Create env file
+
+```bash
+cp env.vds.example env.vds
+nano env.vds
+```
+
+Example:
+
+```env
+DOMAIN=roode.pp.ua
+JWT_SECRET=replace-this-with-a-long-random-string
+POSTGRES_DB=roode
+POSTGRES_USER=roode
+POSTGRES_PASSWORD=replace-this-with-a-strong-password
+```
+
+### 4. Start the full stack
+
+```bash
+bash deploy-vds.sh env.vds
+```
+
+### 5. Check container status
+
+```bash
+docker compose --env-file env.vds ps
+docker compose --env-file env.vds logs --tail=80 app
+docker compose --env-file env.vds logs --tail=80 caddy
+```
+
+The Docker stack contains:
+
+- `db` - PostgreSQL
+- `app` - Node.js app
+- `caddy` - reverse proxy with automatic HTTPS for `roode.pp.ua`
+
+## Manual deploy to VDS with WinSCP
 
 This project is already prepared for deployment on:
 
@@ -123,6 +180,16 @@ sudo ufw enable
 
 ## How to update the site later
 
+### Docker mode
+
+```bash
+cd /opt/roode
+git pull
+bash deploy-vds.sh env.vds
+```
+
+### Manual mode
+
 1. Upload changed files to `/var/www/roode` through WinSCP.
 2. Run:
 
@@ -135,6 +202,10 @@ sudo systemctl restart roode
 ## Useful commands for debugging
 
 ```bash
+docker compose --env-file env.vds ps
+docker compose --env-file env.vds logs --tail=80 app
+docker compose --env-file env.vds logs --tail=80 db
+docker compose --env-file env.vds logs --tail=80 caddy
 sudo systemctl status roode
 sudo journalctl -u roode -n 100 --no-pager
 sudo nginx -t
