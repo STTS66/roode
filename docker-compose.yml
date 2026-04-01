@@ -19,9 +19,8 @@ services:
     build:
       context: ./server
     restart: unless-stopped
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
+    ports:
+      - "127.0.0.1:3000:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -43,17 +42,12 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
+    network_mode: host
     depends_on:
       app:
         condition: service_healthy
     environment:
       DOMAIN: ${DOMAIN}
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
