@@ -19,6 +19,9 @@ services:
     build:
       context: ./server
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -40,6 +43,9 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
       app:
         condition: service_healthy
