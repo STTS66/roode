@@ -2,12 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
 const express = require('express');
-const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const db = require('./db');
 
 for (const envPath of [
     path.join(__dirname, '.env'),
@@ -22,18 +22,6 @@ for (const envPath of [
 // ============ CONFIG ============
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'roode_super_secret_key_change_me';
-const DB_URL = process.env.DATABASE_URL;
-const poolConfig = DB_URL ? {
-    connectionString: DB_URL
-} : {
-    host: process.env.PGHOST || 'localhost',
-    port: Number(process.env.PGPORT || 5432),
-    user: process.env.PGUSER || 'roode',
-    password: process.env.PGPASSWORD || 'roode_pass',
-    database: process.env.PGDATABASE || 'roode_db'
-};
-
-const pool = new Pool(poolConfig);
 
 const app = express();
 app.set('trust proxy', 1);
@@ -69,15 +57,12 @@ app.post('/api/auth/register', async (req, res) => {
 
     try {
         // Check if user exists
-        const existing = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-        if (existing.rows.length > 0) return res.status(409).json({ error: 'Пользователь уже существует' });
+        const existing = db.findUserByUsername(username);
+        if (existing) return res.status(409).json({ error: 'Пользователь уже существует' });
 
         const hash = await bcrypt.hash(password, 10);
-        const result = await pool.query(
-            'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username, created_at',
-            [username, hash]
-        );
-        res.json({ ok: true, user: result.rows[0] });
+        const newUser = db.createUser(username, hash);
+        res.json({ ok: true, user: { id: newUser.id, username: newUser.username, created_at: newUser.created_at } });
     } catch (e) {
         console.error('Register error:', e);
         res.status(500).json({ error: 'Ошибка сервера' });
@@ -90,10 +75,9 @@ app.post('/api/auth/login', async (req, res) => {
     if (!username || !password) return res.status(400).json({ error: 'Введите логин и пароль' });
 
     try {
-        const result = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-        if (result.rows.length === 0) return res.status(401).json({ error: 'Неверный логин или пароль' });
+        const user = db.findUserByUsername(username);
+        if (!user) return res.status(401).json({ error: 'Неверный логин или пароль' });
 
-        const user = result.rows[0];
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) return res.status(401).json({ error: 'Неверный логин или пароль' });
 
@@ -115,10 +99,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 // List projects
 app.get('/api/projects', authMiddleware, async (req, res) => {
     try {
-        const { rows } = await pool.query(
-            'SELECT * FROM projects WHERE user_id = $1 ORDER BY created_at DESC',
-            [req.userId]
-        );
+        const rows = db.findProjectsByUserId(req.userId);
         res.json(rows);
     } catch (e) {
         console.error(e);
@@ -132,11 +113,8 @@ app.post('/api/projects', authMiddleware, async (req, res) => {
     if (!name) return res.status(400).json({ error: 'Укажите имя проекта' });
 
     try {
-        const { rows } = await pool.query(
-            'INSERT INTO projects (user_id, name, folder_path) VALUES ($1, $2, $3) RETURNING *',
-            [req.userId, name, folder_path || '']
-        );
-        res.json(rows[0]);
+        const newProject = db.createProject(req.userId, name, folder_path);
+        res.json(newProject);
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Ошибка создания проекта' });
@@ -148,23 +126,9 @@ app.put('/api/projects/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     const { name, folder_path, last_file } = req.body;
     try {
-        const fields = [];
-        const values = [];
-        let idx = 1;
-
-        if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
-        if (folder_path !== undefined) { fields.push(`folder_path = $${idx++}`); values.push(folder_path); }
-        if (last_file !== undefined) { fields.push(`last_file = $${idx++}`); values.push(last_file); }
-
-        if (fields.length === 0) return res.status(400).json({ error: 'Нет данных для обновления' });
-
-        values.push(id, req.userId);
-        const { rows } = await pool.query(
-            `UPDATE projects SET ${fields.join(', ')} WHERE id = $${idx++} AND user_id = $${idx} RETURNING *`,
-            values
-        );
-        if (rows.length === 0) return res.status(404).json({ error: 'Проект не найден' });
-        res.json(rows[0]);
+        const project = db.updateProject(id, req.userId, { name, folder_path, last_file });
+        if (!project) return res.status(404).json({ error: 'Проект не найден' });
+        res.json(project);
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Ошибка обновления' });
@@ -174,8 +138,8 @@ app.put('/api/projects/:id', authMiddleware, async (req, res) => {
 // Delete project
 app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
     try {
-        await pool.query('DELETE FROM projects WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
-        res.json({ ok: true });
+        const success = db.deleteProject(req.params.id, req.userId);
+        res.json({ ok: success });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Ошибка удаления' });
@@ -187,14 +151,7 @@ app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
 // List versions for a project
 app.get('/api/projects/:projectId/versions', authMiddleware, async (req, res) => {
     try {
-        const { rows } = await pool.query(
-            `SELECT pv.id, pv.version, pv.label, pv.created_at 
-             FROM project_versions pv
-             JOIN projects p ON p.id = pv.project_id
-             WHERE pv.project_id = $1 AND p.user_id = $2
-             ORDER BY pv.created_at DESC`,
-            [req.params.projectId, req.userId]
-        );
+        const rows = db.findVersionsByProjectId(req.params.projectId, req.userId);
         res.json(rows);
     } catch (e) {
         console.error(e);
@@ -208,11 +165,8 @@ app.post('/api/projects/:projectId/versions', authMiddleware, async (req, res) =
     if (!version || !files) return res.status(400).json({ error: 'Укажите версию и файлы' });
 
     try {
-        const { rows } = await pool.query(
-            'INSERT INTO project_versions (project_id, version, label, files) VALUES ($1, $2, $3, $4) RETURNING *',
-            [req.params.projectId, version, label || null, typeof files === 'string' ? files : JSON.stringify(files)]
-        );
-        res.json(rows[0]);
+        const newVersion = db.createVersion(req.params.projectId, version, label, files);
+        res.json(newVersion);
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Ошибка сохранения версии' });
@@ -222,14 +176,9 @@ app.post('/api/projects/:projectId/versions', authMiddleware, async (req, res) =
 // Get single version (for restore)
 app.get('/api/versions/:id', authMiddleware, async (req, res) => {
     try {
-        const { rows } = await pool.query(
-            `SELECT pv.* FROM project_versions pv
-             JOIN projects p ON p.id = pv.project_id
-             WHERE pv.id = $1 AND p.user_id = $2`,
-            [req.params.id, req.userId]
-        );
-        if (rows.length === 0) return res.status(404).json({ error: 'Версия не найдена' });
-        res.json(rows[0]);
+        const version = db.findVersionById(req.params.id, req.userId);
+        if (!version) return res.status(404).json({ error: 'Версия не найдена' });
+        res.json(version);
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Ошибка загрузки версии' });
@@ -239,12 +188,8 @@ app.get('/api/versions/:id', authMiddleware, async (req, res) => {
 // Delete version
 app.delete('/api/versions/:id', authMiddleware, async (req, res) => {
     try {
-        await pool.query(
-            `DELETE FROM project_versions pv USING projects p 
-             WHERE pv.project_id = p.id AND pv.id = $1 AND p.user_id = $2`,
-            [req.params.id, req.userId]
-        );
-        res.json({ ok: true });
+        const success = db.deleteVersion(req.params.id, req.userId);
+        res.json({ ok: success });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Ошибка удаления версии' });
@@ -254,10 +199,10 @@ app.delete('/api/versions/:id', authMiddleware, async (req, res) => {
 // ============ NOTES ROUTES ============
 
 app.get('/api/health', async (_req, res) => {
-    try {
-        await pool.query('SELECT 1');
-        res.json({ ok: true, service: 'roode-server', database: 'up' });
-    } catch (error) {
+    const dbOk = db.checkHealth();
+    if (dbOk) {
+        res.json({ ok: true, service: 'roode-server', database: 'json-file-db' });
+    } else {
         res.status(503).json({ ok: false, service: 'roode-server', database: 'down' });
     }
 });
@@ -265,10 +210,7 @@ app.get('/api/health', async (_req, res) => {
 // List notes
 app.get('/api/notes', authMiddleware, async (req, res) => {
     try {
-        const { rows } = await pool.query(
-            'SELECT * FROM notes WHERE user_id = $1 ORDER BY updated_at DESC',
-            [req.userId]
-        );
+        const rows = db.findNotesByUserId(req.userId);
         res.json(rows);
     } catch (e) {
         console.error(e);
@@ -280,11 +222,8 @@ app.get('/api/notes', authMiddleware, async (req, res) => {
 app.post('/api/notes', authMiddleware, async (req, res) => {
     const { title, content } = req.body;
     try {
-        const { rows } = await pool.query(
-            'INSERT INTO notes (user_id, title, content) VALUES ($1, $2, $3) RETURNING *',
-            [req.userId, title || 'Без названия', content || '']
-        );
-        res.json(rows[0]);
+        const newNote = db.createNote(req.userId, title, content);
+        res.json(newNote);
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error creating note' });
@@ -295,11 +234,9 @@ app.post('/api/notes', authMiddleware, async (req, res) => {
 app.put('/api/notes/:id', authMiddleware, async (req, res) => {
     const { title, content } = req.body;
     try {
-        const { rows } = await pool.query(
-            'UPDATE notes SET title = COALESCE($1, title), content = COALESCE($2, content), updated_at = NOW() WHERE id = $3 AND user_id = $4 RETURNING *',
-            [title, content, req.params.id, req.userId]
-        );
-        res.json(rows[0]);
+        const note = db.updateNote(req.params.id, req.userId, title, content);
+        if (!note) return res.status(404).json({ error: 'Error updating note: note not found' });
+        res.json(note);
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error updating note' });
@@ -309,8 +246,8 @@ app.put('/api/notes/:id', authMiddleware, async (req, res) => {
 // Delete note
 app.delete('/api/notes/:id', authMiddleware, async (req, res) => {
     try {
-        await pool.query('DELETE FROM notes WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
-        res.json({ ok: true });
+        const success = db.deleteNote(req.params.id, req.userId);
+        res.json({ ok: success });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error deleting note' });
